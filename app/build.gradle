@@ -8,8 +8,8 @@ android {
 
     defaultConfig {
         applicationId 'com.blithe.legacysend'
-        minSdk 19
-        targetSdk 28
+        minSdk 9
+        targetSdk 20
         versionCode 4
         versionName '1.2.2'
         testInstrumentationRunner 'android.test.InstrumentationTestRunner'
