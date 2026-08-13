@@ -361,7 +361,7 @@ public final class TransferServer {
             Map<String, String> query = question < 0 ? new HashMap<String, String>()
                     : parseQuery(rawTarget.substring(question + 1));
             long length = headers.containsKey("content-length")
-                    ? Long.parseLong(headers.get("content-length")) : -1L;
+                    ? Long.parseLong((headers.get("content-length")).trim()) : -1L;
             return new Request(parts[0], path, query, length);
         }
 
