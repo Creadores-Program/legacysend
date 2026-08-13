@@ -12,4 +12,6 @@
     <string name="sending_to">Enviando a %1$s (%2$d/%3$d)</string>
     <string name="receiving_from">Recibiendo archivos de %1$s</string>
     <string name="receive_finished">Recepción completada, archivo guardado en: %1$s</string>
+    <string name="notif_receive_title">LegacySend está ejecutándose</string>
+    <string name="notif_receive_text">Esperando archivos en la red local…</string>
 </resource>
