@@ -12,4 +12,6 @@
     <string name="sending_to">Sending to %1$s (%2$d/%3$d)</string>
     <string name="receiving_from">Receiving files from %1$s</string>
     <string name="receive_finished">Receive finished, file saved in: %1$s</string>
+    <string name="notif_receive_title">LegacySend is running</string>
+    <string name="notif_receive_text">Waiting for local network files…</string>
 </resource>
