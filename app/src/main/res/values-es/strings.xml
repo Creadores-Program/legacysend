@@ -16,4 +16,6 @@
     <string name="notif_receive_text">Esperando archivos en la red local…</string>
     <string name="error_discovery_failed">Error en el descubrimiento de dispositivos: %1$s</string>
     <string name="error_announce_failed">Error al enviar el anuncio de dispositivo: %1$s</string>
+    <string name="unknown_device">Dispositivo desconocido</string>
+    <string name="unknown_address">Dirección desconocida</string>
 </resource>
