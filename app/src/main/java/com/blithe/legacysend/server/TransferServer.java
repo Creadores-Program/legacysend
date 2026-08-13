@@ -233,7 +233,7 @@ public final class TransferServer {
         }
         final File target;
         synchronized (StorageUtils.class) {
-            target = StorageUtils.uniqueFile(directory, metadata.getFileName());
+            target = StorageUtils.uniqueFile(context, directory, metadata.getFileName());
             if (!target.createNewFile()) {
                 throw new IOException(context.getString(R.string.error_reserve_file_failed));
             }
