@@ -21,4 +21,11 @@
     <string name="error_cert_missing">对方未提供有效的 SSL 证书。</string>
     <string name="error_cert_fingerprint_mismatch">设备 SSL 证书指纹不匹配。</string>
     <string name="error_cert_verify_failed">无法校验对方证书指纹。</string>
+    <string name="error_server_accept_failed">接收服务异常：%1$s</string>
+    <string name="error_endpoint_not_found">接口不存在</string>
+    <string name="error_file_size_mismatch">文件大小不匹配</string>
+    <string name="error_create_directory_failed">无法创建保存目录</string>
+    <string name="error_reserve_file_failed">无法预留目标文件名</string>
+    <string name="error_reception_cancelled">接收已取消</string>
+    <string name="error_save_file_failed">无法保存文件</string>
 </resource>
