@@ -59,16 +59,17 @@ public final class LegacySendApp extends Application implements DiscoveryManager
                 try {
                     identity = TlsIdentity.loadOrCreate(LegacySendApp.this);
                     String model = Build.MANUFACTURER + " " + Build.MODEL;
-                    String alias = Build.MODEL == null || Build.MODEL.length() == 0 ? "安卓设备" : Build.MODEL;
-                    // Android 4.x 的 TLS 服务端只提供现代 Rust TLS 已移除的 CBC 密码套件。
-                    // LocalSend v2 明确定义了 HTTP 模式，因此旧系统接收端使用 HTTP 以保持互操作。
+                    String defaultAlias = getString(R.string.default_device_alias);
+                    String alias = (Build.MODEL == null || Build.MODEL.length() == 0) ? defaultAlias : Build.MODEL;
+                    
                     String receiveProtocol = Build.VERSION.SDK_INT <= 20 ? "http" : "https";
+                    
                     self = new DeviceInfo(alias, DeviceInfo.PROTOCOL_VERSION, model.trim(), "mobile",
                             identity.getFingerprint(), DiscoveryManager.PORT, receiveProtocol, false, null);
                     transferClient = new TransferClient(getContentResolver(), identity, self);
                     postReady();
                 } catch (Exception error) {
-                    postService(false, "初始化安全证书失败：" + readable(error));
+                    postService(false, getString(R.string.error_init_cert) + readable(error));
                 }
             }
         });
@@ -80,9 +81,8 @@ public final class LegacySendApp extends Application implements DiscoveryManager
             if (self != null) listener.onReady(self);
             boolean running = server != null && server.isRunning();
             String detail = running && self != null
-                    ? "接收服务运行中 · " + self.getProtocol().toUpperCase(java.util.Locale.US)
-                            + " 端口 " + self.getPort()
-                    : "接收服务已停止";
+                    ? getString(R.string.service_running, self.getProtocol().toUpperCase(java.util.Locale.US), self.getPort())
+                    : getString(R.string.service_stopped);
             listener.onServiceChanged(running, detail);
             listener.onDevicesChanged(deviceSnapshot());
             if (activeIncoming != null && activeIncoming.getDecision() == IncomingSession.Decision.PENDING) {
@@ -94,7 +94,7 @@ public final class LegacySendApp extends Application implements DiscoveryManager
     public void startReceiving() {
         if (starting || (server != null && server.isRunning())) return;
         starting = true;
-        postService(false, "正在启动接收服务…");
+        postService(false, getString(R.string.service_starting));
         background.execute(new Runnable() {
             @Override public void run() {
                 TransferServer newServer = null;
@@ -102,26 +102,23 @@ public final class LegacySendApp extends Application implements DiscoveryManager
                 try {
                     int attempts = 0;
                     while ((identity == null || self == null) && attempts++ < 200) Thread.sleep(50L);
-                    if (identity == null || self == null) throw new IllegalStateException("设备身份初始化超时");
+                    if (identity == null || self == null) throw new IllegalStateException(getString(R.string.error_identity_timeout));
                     waitForConnectedNetwork();
-                    newServer = new TransferServer(LegacySendApp.this, identity, self,
-                            LegacySendApp.this);
+                    newServer = new TransferServer(LegacySendApp.this, identity, self, LegacySendApp.this);
                     newServer.start();
-                    newDiscovery = new DiscoveryManager(LegacySendApp.this, self,
-                            LegacySendApp.this);
+                    newDiscovery = new DiscoveryManager(LegacySendApp.this, self, LegacySendApp.this);
                     newDiscovery.start();
                     server = newServer;
                     discovery = newDiscovery;
                     startKeepAliveService();
-                    postService(true, "接收服务运行中 · "
-                            + self.getProtocol().toUpperCase(java.util.Locale.US) + " 端口 53317");
+                    postService(true, getString(R.string.service_running, self.getProtocol().toUpperCase(java.util.Locale.US), DiscoveryManager.PORT));
                 } catch (Exception error) {
                     Log.e(TAG, "Failed to start receiving", error);
                     if (newDiscovery != null) newDiscovery.stop();
                     if (newServer != null) newServer.stop();
                     if (server == newServer) server = null;
                     if (discovery == newDiscovery) discovery = null;
-                    postService(false, "启动失败：" + readable(error));
+                    postService(false, getString(R.string.error_start_failed) + readable(error));
                 } finally {
                     starting = false;
                 }
@@ -132,12 +129,28 @@ public final class LegacySendApp extends Application implements DiscoveryManager
     private void waitForConnectedNetwork() throws InterruptedException {
         ConnectivityManager connectivity = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         if (connectivity == null) return;
+        
         for (int attempt = 0; attempt < NETWORK_WAIT_ATTEMPTS; attempt++) {
-            NetworkInfo active = connectivity.getActiveNetworkInfo();
+            NetworkInfo active = null;
+            
+            if (Build.VERSION.SDK_INT >= 14) {
+                active = connectivity.getActiveNetworkInfo();
+            } else {
+                NetworkInfo[] info = connectivity.getAllNetworkInfo();
+                if (info != null) {
+                    for (NetworkInfo ni : info) {
+                        if (ni != null && ni.getState() == NetworkInfo.State.CONNECTED) {
+                            active = ni;
+                            break;
+                        }
+                    }
+                }
+            }
+            
             if (active != null && active.isConnected()) return;
             Thread.sleep(NETWORK_WAIT_DELAY_MS);
         }
-        throw new IllegalStateException("网络尚未连接，请连接 Wi-Fi 后重试");
+        throw new IllegalStateException(getString(R.string.error_no_network));
     }
 
     public void stopReceiving() {
@@ -148,7 +161,7 @@ public final class LegacySendApp extends Application implements DiscoveryManager
         if (currentDiscovery != null) currentDiscovery.stop();
         if (currentServer != null) currentServer.stop();
         stopService(new Intent(this, ReceiveService.class));
-        postService(false, "接收服务已停止");
+        postService(false, getString(R.string.service_stopped));
     }
 
     public void refreshDiscovery() {
@@ -164,15 +177,15 @@ public final class LegacySendApp extends Application implements DiscoveryManager
 
     public void sendFiles(final DeviceInfo target, final List<TransferFile> files) {
         if (transferClient == null) {
-            postResult(true, false, "应用尚未初始化完成");
+            postResult(true, false, getString(R.string.error_not_initialized));
             return;
         }
         background.execute(new Runnable() {
             @Override public void run() {
                 transferClient.send(target, files, new TransferClient.Listener() {
                     @Override public void onProgress(String file, int index, int count, int percent) {
-                        postProgress(true, "正在发送到 " + target.getAlias() + "（" + index + "/" + count + "）",
-                                file, percent, "");
+                        String title = getString(R.string.sending_to, target.getAlias(), index, count);
+                        postProgress(true, title, file, percent, "");
                     }
                     @Override public void onFinished(String message) { postResult(true, true, message); }
                     @Override public void onFailed(String message) { postResult(true, false, message); }
@@ -225,15 +238,14 @@ public final class LegacySendApp extends Application implements DiscoveryManager
         });
     }
 
-    @Override public void onReceiveProgress(IncomingSession session, String fileName, int percent,
-                                            String savePath) {
-        postProgress(false, "正在接收来自 " + session.getSender().getAlias() + " 的文件",
-                fileName, percent, savePath);
+    @Override public void onReceiveProgress(IncomingSession session, String fileName, int percent, String savePath) {
+        String title = getString(R.string.receiving_from, session.getSender().getAlias());
+        postProgress(false, title, fileName, percent, savePath);
     }
 
     @Override public void onReceiveFinished(IncomingSession session, String savePath) {
         if (activeIncoming == session) activeIncoming = null;
-        postResult(false, true, "接收完成，文件保存在：" + savePath);
+        postResult(false, true, getString(R.string.receive_finished, savePath));
     }
 
     @Override public void onReceiveFailed(IncomingSession session, String message) {
@@ -302,7 +314,7 @@ public final class LegacySendApp extends Application implements DiscoveryManager
 
     private void startKeepAliveService() {
         Intent intent = new Intent(this, ReceiveService.class);
-        if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent); else startService(intent);
+        startService(intent);
     }
 
     private static String readable(Exception error) {
