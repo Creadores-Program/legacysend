@@ -14,4 +14,6 @@
     <string name="receive_finished">接收完成，文件保存在：%1$s</string>>
     <string name="notif_receive_title">旧版互传正在运行</string>
     <string name="notif_receive_text">正在等待局域网文件…</string>
+    <string name="error_discovery_failed">设备发现失败：%1$s</string>
+    <string name="error_announce_failed">发送设备公告失败：%1$s</string>
 </resource>
