@@ -18,4 +18,7 @@
     <string name="error_announce_failed">Error al enviar el anuncio de dispositivo: %1$s</string>
     <string name="unknown_device">Dispositivo desconocido</string>
     <string name="unknown_address">Dirección desconocida</string>
+    <string name="error_cert_missing">El dispositivo remoto no proporcionó un certificado SSL válido.</string>
+    <string name="error_cert_fingerprint_mismatch">La huella digital del certificado SSL no coincide.</string>
+    <string name="error_cert_verify_failed">No se pudo verificar la huella digital del certificado.</string>
 </resource>
