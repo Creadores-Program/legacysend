@@ -3,6 +3,7 @@ package com.blithe.legacysend.discovery;
 import android.content.Context;
 import android.net.wifi.WifiManager;
 
+import com.blithe.legacysend.R;
 import com.blithe.legacysend.model.DeviceInfo;
 
 import org.json.JSONObject;
@@ -44,22 +45,24 @@ public final class DiscoveryManager {
         WifiManager.MulticastLock newMulticastLock = null;
         boolean joined = false;
         try {
-            WifiManager wifi = (WifiManager) context.getApplicationContext()
-                    .getSystemService(Context.WIFI_SERVICE);
+            WifiManager wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
             if (wifi != null) {
                 newMulticastLock = wifi.createMulticastLock("legacysend-discovery");
                 newMulticastLock.setReferenceCounted(false);
                 newMulticastLock.acquire();
             }
+            
             newSocket = new MulticastSocket(null);
             newSocket.setReuseAddress(true);
             newSocket.bind(new InetSocketAddress(PORT));
             newSocket.setSoTimeout(1500);
             newSocket.joinGroup(InetAddress.getByName(GROUP));
             joined = true;
+            
             socket = newSocket;
             multicastLock = newMulticastLock;
             running.set(true);
+            
             listenThread = new Thread(new Runnable() {
                 @Override public void run() { listenLoop(); }
             }, "LegacySend-discovery");
@@ -75,7 +78,9 @@ public final class DiscoveryManager {
                 }
                 newSocket.close();
             }
-            if (newMulticastLock != null && newMulticastLock.isHeld()) newMulticastLock.release();
+            if (newMulticastLock != null && newMulticastLock.isHeld()) {
+                newMulticastLock.release();
+            }
             multicastLock = null;
             throw error;
         }
@@ -93,7 +98,9 @@ public final class DiscoveryManager {
             try { current.leaveGroup(safeGroup()); } catch (Exception ignored) {}
             current.close();
         }
-        if (multicastLock != null && multicastLock.isHeld()) multicastLock.release();
+        if (multicastLock != null && multicastLock.isHeld()) {
+            multicastLock.release();
+        }
         multicastLock = null;
     }
 
@@ -105,17 +112,22 @@ public final class DiscoveryManager {
                 MulticastSocket current = socket;
                 if (current == null) break;
                 current.receive(packet);
+                
                 String text = new String(packet.getData(), packet.getOffset(), packet.getLength(), UTF8);
                 JSONObject json = new JSONObject(text);
                 DeviceInfo device = DeviceInfo.fromJson(json, packet.getAddress());
+                
                 if (self.getFingerprint().equals(device.getFingerprint())) continue;
+                
                 boolean announce = json.optBoolean("announce", false);
                 listener.onDevice(device, announce);
                 if (announce) send(self, false);
             } catch (java.net.SocketTimeoutException ignored) {
-                // 周期性检查停止标志。
             } catch (Exception error) {
-                if (running.get()) listener.onDiscoveryError("设备发现失败：" + error.getMessage());
+                if (running.get()) {
+                    String msg = context.getString(R.string.error_discovery_failed, readable(error));
+                    listener.onDiscoveryError(msg);
+                }
             }
         }
     }
@@ -125,13 +137,22 @@ public final class DiscoveryManager {
             byte[] data = device.toJson(announce, true).toString().getBytes(UTF8);
             DatagramPacket packet = new DatagramPacket(data, data.length, safeGroup(), PORT);
             MulticastSocket current = socket;
-            if (current != null && running.get()) current.send(packet);
+            if (current != null && running.get()) {
+                current.send(packet);
+            }
         } catch (Exception error) {
-            if (running.get()) listener.onDiscoveryError("发送设备公告失败：" + error.getMessage());
+            if (running.get()) {
+                String msg = context.getString(R.string.error_announce_failed, readable(error));
+                listener.onDiscoveryError(msg);
+            }
         }
     }
 
     private static InetAddress safeGroup() throws java.net.UnknownHostException {
         return InetAddress.getByName(GROUP);
+    }
+
+    private static String readable(Exception error) {
+        return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
     }
 }
