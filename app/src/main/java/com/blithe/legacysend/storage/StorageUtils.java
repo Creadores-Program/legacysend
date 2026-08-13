@@ -1,7 +1,7 @@
 package com.blithe.legacysend.storage;
 
-import android.content.Context;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
@@ -9,22 +9,23 @@ import android.os.Environment;
 import android.provider.OpenableColumns;
 import android.webkit.MimeTypeMap;
 
+import com.blithe.legacysend.R;
 import com.blithe.legacysend.model.TransferFile;
 
 import java.io.File;
+import java.util.Locale;
 import java.util.UUID;
 
 public final class StorageUtils {
     private StorageUtils() {}
 
-    public static TransferFile describe(ContentResolver resolver, Uri uri) {
-        // ES 文件浏览器在 Android 4.x 上通过 file:// URI 分享文件。这类 URI 没有
-        // ContentProvider，因此无法通过 OpenableColumns 查询名称，需要直接读取路径。
+    public static TransferFile describe(Context context, ContentResolver resolver, Uri uri) {
         if ("file".equalsIgnoreCase(uri.getScheme()) && uri.getPath() != null) {
-            return describe(new File(uri.getPath()), uri);
+            return describe(context, new File(uri.getPath()), uri);
         }
 
-        String name = "未命名文件";
+        String defaultName = context != null ? context.getString(R.string.unnamed_file) : "Unnamed_File";
+        String name = defaultName;
         long size = -1L;
         Cursor cursor = resolver.query(uri, new String[] {
                 OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE
@@ -51,19 +52,19 @@ public final class StorageUtils {
             } catch (Exception ignored) {}
         }
         String type = resolver.getType(uri);
-        return new TransferFile(UUID.randomUUID().toString(), sanitizeFileName(name),
+        return new TransferFile(UUID.randomUUID().toString(), sanitizeFileName(context, name),
                 Math.max(0L, size), type, uri);
     }
 
-    public static TransferFile describe(File file) {
-        return describe(file, Uri.fromFile(file));
+    public static TransferFile describe(Context context, File file) {
+        return describe(context, file, Uri.fromFile(file));
     }
 
-    private static TransferFile describe(File file, Uri uri) {
+    private static TransferFile describe(Context context, File file, Uri uri) {
         String extension = MimeTypeMap.getFileExtensionFromUrl(Uri.fromFile(file).toString());
         String type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
-                extension == null ? "" : extension.toLowerCase(java.util.Locale.US));
-        return new TransferFile(UUID.randomUUID().toString(), sanitizeFileName(file.getName()),
+                extension == null ? "" : extension.toLowerCase(Locale.US));
+        return new TransferFile(UUID.randomUUID().toString(), sanitizeFileName(context, file.getName()),
                 file.length(), type, uri);
     }
 
@@ -78,8 +79,8 @@ public final class StorageUtils {
         return new File(downloads, "LegacySend");
     }
 
-    public static File uniqueFile(File directory, String requestedName) {
-        String safe = sanitizeFileName(requestedName);
+    public static File uniqueFile(Context context, File directory, String requestedName) {
+        String safe = sanitizeFileName(context, requestedName);
         File candidate = new File(directory, safe);
         if (!candidate.exists()) return candidate;
         int dot = safe.lastIndexOf('.');
@@ -92,11 +93,12 @@ public final class StorageUtils {
         return new File(directory, base + "-" + System.currentTimeMillis() + extension);
     }
 
-    public static String sanitizeFileName(String name) {
-        if (name == null || name.trim().length() == 0) return "未命名文件";
+    public static String sanitizeFileName(Context context, String name) {
+        String defaultName = context != null ? context.getString(R.string.unnamed_file) : "Unnamed_File";
+        if (name == null || name.trim().length() == 0) return defaultName;
         String safe = name.replace('/', '_').replace('\\', '_').replace('\u0000', '_');
         while (safe.startsWith(".")) safe = safe.substring(1);
-        if (safe.length() == 0) return "未命名文件";
+        if (safe.length() == 0) return defaultName;
         return safe;
     }
 }
