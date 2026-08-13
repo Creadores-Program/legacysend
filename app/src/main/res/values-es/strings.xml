@@ -21,4 +21,11 @@
     <string name="error_cert_missing">El dispositivo remoto no proporcionó un certificado SSL válido.</string>
     <string name="error_cert_fingerprint_mismatch">La huella digital del certificado SSL no coincide.</string>
     <string name="error_cert_verify_failed">No se pudo verificar la huella digital del certificado.</string>
+    <string name="error_server_accept_failed">Excepción del servidor: %1$s</string>
+    <string name="error_endpoint_not_found">El extremo o ruta no existe</string>
+    <string name="error_file_size_mismatch">El tamaño del archivo no coincide</string>
+    <string name="error_create_directory_failed">No se pudo crear el directorio de destino</string>
+    <string name="error_reserve_file_failed">No se pudo reservar el nombre del archivo</string>
+    <string name="error_reception_cancelled">La recepción fue cancelada</string>
+    <string name="error_save_file_failed">No se pudo guardar el archivo</string>
 </resource>
