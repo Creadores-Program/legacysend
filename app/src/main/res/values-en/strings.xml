@@ -29,4 +29,12 @@
     <string name="error_reception_cancelled">Reception was cancelled</string>
     <string name="error_save_file_failed">Failed to save file</string>
     <string name="unnamed_file">Unnamed_File</string>
+    <string name="error_no_files_selected">No files selected</string>
+    <string name="msg_no_files_needed">The recipient does not need to receive these files</string>
+    <string name="error_recipient_rejected">Recipient rejected the transfer</string>
+    <string name="error_cannot_read_file">Cannot read file: %1$s</string>
+    <string name="msg_files_sent_successfully">Files sent successfully</string>
+    <string name="error_file_not_found_or_permission">Cannot read selected file. The file may have been deleted or storage permissions expired</string>
+    <string name="msg_send_cancelled">Sending cancelled</string>
+    <string name="error_remote_returned_status">Remote server error %1$d%2$s</string>
 </resource>
