@@ -66,7 +66,7 @@ public final class LegacySendApp extends Application implements DiscoveryManager
                     
                     self = new DeviceInfo(alias, DeviceInfo.PROTOCOL_VERSION, model.trim(), "mobile",
                             identity.getFingerprint(), DiscoveryManager.PORT, receiveProtocol, false, null);
-                    transferClient = new TransferClient(this, getContentResolver(), identity, self);
+                    transferClient = new TransferClient(LegacySendApp.this, getContentResolver(), identity, self);
                     postReady();
                 } catch (Exception error) {
                     postService(false, getString(R.string.error_init_cert) + readable(error));
