@@ -16,4 +16,6 @@
     <string name="notif_receive_text">正在等待局域网文件…</string>
     <string name="error_discovery_failed">设备发现失败：%1$s</string>
     <string name="error_announce_failed">发送设备公告失败：%1$s</string>
+    <string name="unknown_device">未知设备</string>
+    <string name="unknown_address">未知地址</string>
 </resource>
