@@ -223,7 +223,7 @@ public final class TransferServer {
             respond(output, 409, "text/plain", new byte[0]);
             return;
         }
-        if (!request.isChucked && (request.contentLength < 0 || request.contentLength != metadata.getSize())) {
+        if (!request.isChunked && (request.contentLength < 0 || request.contentLength != metadata.getSize())) {
             respond(output, 400, "text/plain; charset=utf-8", context.getString(R.string.error_file_size_mismatch).getBytes(UTF8));
             return;
         }
@@ -376,7 +376,7 @@ public final class TransferServer {
             boolean isChunked = transferEncoding != null && transferEncoding.toLowerCase(Locale.US).contains("chunked");
             long length = headers.containsKey("content-length")
                     ? Long.parseLong(headers.get("content-length")) : -1L;
-            return new Request(parts[0], path, query, length);
+            return new Request(parts[0], path, query, length, isChunked);
         }
 
         private static Map<String, String> parseQuery(String value) throws Exception {
