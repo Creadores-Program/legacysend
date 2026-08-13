@@ -28,4 +28,5 @@
     <string name="error_reserve_file_failed">无法预留目标文件名</string>
     <string name="error_reception_cancelled">接收已取消</string>
     <string name="error_save_file_failed">无法保存文件</string>
+    <string name="unnamed_file">未命名文件</string>
 </resource>
