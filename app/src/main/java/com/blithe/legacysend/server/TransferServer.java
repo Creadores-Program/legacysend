@@ -345,7 +345,7 @@ public final class TransferServer {
         final String path;
         final Map<String, String> query;
         final long contentLength;
-        final boolean isChunked
+        final boolean isChunked;
 
         Request(String method, String path, Map<String, String> query, long contentLength, boolean isChucked) {
             this.method = method;
