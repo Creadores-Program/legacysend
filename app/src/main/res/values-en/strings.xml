@@ -16,4 +16,6 @@
     <string name="notif_receive_text">Waiting for local network files…</string>
     <string name="error_discovery_failed">Device discovery failed: %1$s</string>
     <string name="error_announce_failed">Failed to send device announcement: %1$s</string>
+    <string name="unknown_device">Unknown Device</string>
+    <string name="unknown_address">Unknown Address</string>
 </resource>
