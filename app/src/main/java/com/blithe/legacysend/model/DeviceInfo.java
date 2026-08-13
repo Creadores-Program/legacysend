@@ -1,5 +1,9 @@
 package com.blithe.legacysend.model;
 
+import android.content.Context;
+
+import com.blithe.legacysend.R;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -32,11 +36,22 @@ public final class DeviceInfo {
         this.address = address;
     }
 
+    public static DeviceInfo fromJson(Context context, JSONObject json, InetAddress address) throws JSONException {
+        String defaultModel = context != null 
+                ? context.getString(R.string.unknown_device) 
+                : "Unknown Device";
+        return fromJsonInternal(json, address, defaultModel);
+    }
+
     public static DeviceInfo fromJson(JSONObject json, InetAddress address) throws JSONException {
+        return fromJsonInternal(json, address, "Unknown Device");
+    }
+
+    private static DeviceInfo fromJsonInternal(JSONObject json, InetAddress address, String defaultModel) throws JSONException {
         return new DeviceInfo(
                 json.getString("alias"),
                 json.optString("version", PROTOCOL_VERSION),
-                json.optString("deviceModel", "未知设备"),
+                json.optString("deviceModel", defaultModel),
                 json.optString("deviceType", "desktop"),
                 json.getString("fingerprint"),
                 json.optInt("port", 53317),
@@ -76,8 +91,15 @@ public final class DeviceInfo {
         return fingerprint + "@" + (address == null ? "" : address.getHostAddress());
     }
 
+    public String getFormattedDetails(Context context) {
+        String host = (address == null) 
+                ? context.getString(R.string.unknown_address) 
+                : address.getHostAddress();
+        return alias + "\n" + deviceModel + " · " + host + ":" + port;
+    }
+
     @Override public String toString() {
-        String host = address == null ? "未知地址" : address.getHostAddress();
+        String host = address == null ? "Unknown Address" : address.getHostAddress();
         return alias + "\n" + deviceModel + " · " + host + ":" + port;
     }
 }
