@@ -1,7 +1,9 @@
 package com.blithe.legacysend.transfer;
 
 import android.content.ContentResolver;
+import android.content.Context;
 
+import com.blithe.legacysend.R;
 import com.blithe.legacysend.model.DeviceInfo;
 import com.blithe.legacysend.model.TransferFile;
 import com.blithe.legacysend.protocol.ProtocolJson;
@@ -11,6 +13,7 @@ import com.blithe.legacysend.util.IoUtils;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -31,6 +34,7 @@ public final class TransferClient {
     }
 
     private static final Charset UTF8 = Charset.forName("UTF-8");
+    private final Context context;
     private final ContentResolver resolver;
     private final TlsIdentity identity;
     private final DeviceInfo self;
@@ -39,21 +43,22 @@ public final class TransferClient {
     private volatile String activeSession;
     private volatile DeviceInfo activeDevice;
 
-    public TransferClient(ContentResolver resolver, TlsIdentity identity, DeviceInfo self) {
+    public TransferClient(Context context, ContentResolver resolver, TlsIdentity identity, DeviceInfo self) {
+        this.context = context.getApplicationContext();
         this.resolver = resolver;
         this.identity = identity;
         this.self = self;
     }
 
     public DeviceInfo register(DeviceInfo remote) throws Exception {
-        HttpURLConnection connection = open(remote, "/api/localsend/v2/register", "POST", 10_000);
+        HttpURLConnection connection = open(remote, "/api/localsend/v2/register", "POST", 10000);
         JSONObject registration = self.toJson(false, true);
         registration.remove("announce");
         writeJson(connection, registration);
         int status = connection.getResponseCode();
         if (status / 100 != 2) throw statusError(connection, status);
         JSONObject response = new JSONObject(readText(connection.getInputStream()));
-        return DeviceInfo.fromJson(response, remote.getAddress());
+        return DeviceInfo.fromJson(context, response, remote.getAddress());
     }
 
     public void send(DeviceInfo remote, List<TransferFile> files, Listener listener) {
@@ -61,16 +66,20 @@ public final class TransferClient {
         activeDevice = remote;
         activeSession = null;
         try {
-            if (files == null || files.isEmpty()) throw new IOException("尚未选择文件");
-            HttpURLConnection prepare = open(remote, "/api/localsend/v2/prepare-upload", "POST", 300_000);
+            if (files == null || files.isEmpty()) {
+                throw new IOException(context.getString(R.string.error_no_files_selected));
+            }
+            HttpURLConnection prepare = open(remote, "/api/localsend/v2/prepare-upload", "POST", 300000);
             activeConnection = prepare;
             writeJson(prepare, ProtocolJson.prepareUpload(self, files));
             int prepareStatus = prepare.getResponseCode();
             if (prepareStatus == 204) {
-                listener.onFinished("对方无需接收这些文件");
+                listener.onFinished(context.getString(R.string.msg_no_files_needed));
                 return;
             }
-            if (prepareStatus == 403) throw new IOException("接收方拒绝了传输");
+            if (prepareStatus == 403) {
+                throw new IOException(context.getString(R.string.error_recipient_rejected));
+            }
             if (prepareStatus / 100 != 2) throw statusError(prepare, prepareStatus);
             JSONObject response = new JSONObject(readText(prepare.getInputStream()));
             String sessionId = response.getString("sessionId");
@@ -86,7 +95,7 @@ public final class TransferClient {
                 String token = tokens.getString(file.getId());
                 String path = "/api/localsend/v2/upload?sessionId=" + encode(sessionId)
                         + "&fileId=" + encode(file.getId()) + "&token=" + encode(token);
-                HttpURLConnection upload = open(remote, path, "POST", 300_000);
+                HttpURLConnection upload = open(remote, path, "POST", 300000);
                 activeConnection = upload;
                 upload.setRequestProperty("Content-Type", "application/octet-stream");
                 upload.setDoOutput(true);
@@ -95,7 +104,9 @@ public final class TransferClient {
                 final long total = totalBytes;
                 final int fileNumber = index + 1;
                 InputStream input = resolver.openInputStream(file.getUri());
-                if (input == null) throw new IOException("无法读取文件：" + file.getFileName());
+                if (input == null) {
+                    throw new IOException(context.getString(R.string.error_cannot_read_file, file.getFileName()));
+                }
                 try {
                     OutputStream output = upload.getOutputStream();
                     try {
@@ -117,13 +128,13 @@ public final class TransferClient {
                 completedBefore += file.getSize();
             }
             listener.onProgress(files.get(files.size() - 1).getFileName(), files.size(), files.size(), 100);
-            listener.onFinished("文件发送成功");
+            listener.onFinished(context.getString(R.string.msg_files_sent_successfully));
         } catch (Exception error) {
             String message = readable(error);
-            if (error instanceof java.io.FileNotFoundException) {
-                message = "无法读取所选文件，文件可能已被删除，或旧版文件选择器的权限已经失效";
+            if (error instanceof FileNotFoundException) {
+                message = context.getString(R.string.error_file_not_found_or_permission);
             }
-            listener.onFailed(cancelled.get() ? "发送已取消" : message);
+            listener.onFailed(cancelled.get() ? context.getString(R.string.msg_send_cancelled) : message);
         } finally {
             HttpURLConnection connection = activeConnection;
             if (connection != null) connection.disconnect();
@@ -144,7 +155,7 @@ public final class TransferClient {
                 @Override public void run() {
                     try {
                         HttpURLConnection cancel = open(device,
-                                "/api/localsend/v2/cancel?sessionId=" + encode(session), "POST", 5_000);
+                                "/api/localsend/v2/cancel?sessionId=" + encode(session), "POST", 5000);
                         cancel.setFixedLengthStreamingMode(0);
                         cancel.setDoOutput(true);
                         cancel.getResponseCode();
@@ -161,7 +172,7 @@ public final class TransferClient {
         URL url = new URL(scheme, remote.getAddress().getHostAddress(), remote.getPort(), path);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod(method);
-        connection.setConnectTimeout(10_000);
+        connection.setConnectTimeout(10000);
         connection.setReadTimeout(readTimeout);
         connection.setUseCaches(false);
         connection.setRequestProperty("Accept", "application/json");
@@ -182,14 +193,16 @@ public final class TransferClient {
         try { output.write(bytes); } finally { output.close(); }
     }
 
-    private static IOException statusError(HttpURLConnection connection, int status) {
+    private IOException statusError(HttpURLConnection connection, int status) {
         String message = "";
         try {
             InputStream error = connection.getErrorStream();
             if (error != null) message = readText(error);
         } catch (Exception ignored) {}
         if (message.length() > 160) message = message.substring(0, 160);
-        return new IOException("对方返回错误 " + status + (message.length() == 0 ? "" : "：" + message));
+        String formatted = context.getString(R.string.error_remote_returned_status, status,
+                message.length() == 0 ? "" : ": " + message);
+        return new IOException(formatted);
     }
 
     private static String readText(InputStream input) throws IOException {
@@ -203,7 +216,9 @@ public final class TransferClient {
     }
 
     private void checkCancelled() throws IOException {
-        if (cancelled.get()) throw new IOException("发送已取消");
+        if (cancelled.get()) {
+            throw new IOException(context.getString(R.string.msg_send_cancelled));
+        }
     }
 
     private static String readable(Exception error) {
