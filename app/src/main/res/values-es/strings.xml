@@ -29,4 +29,12 @@
     <string name="error_reception_cancelled">La recepción fue cancelada</string>
     <string name="error_save_file_failed">No se pudo guardar el archivo</string>
     <string name="unnamed_file">Archivo_Sin_Nombre</string>
+    <string name="error_no_files_selected">Aún no se han seleccionado archivos</string>
+    <string name="msg_no_files_needed">El destinatario no necesita recibir estos archivos</string>
+    <string name="error_recipient_rejected">El destinatario rechazó la transferencia</string>
+    <string name="error_cannot_read_file">No se puede leer el archivo: %1$s</string>
+    <string name="msg_files_sent_successfully">Archivos enviados correctamente</string>
+    <string name="error_file_not_found_or_permission">No se pudo leer el archivo. Es posible que haya sido eliminado o que los permisos del selector hayan expirado</string>
+    <string name="msg_send_cancelled">Envío cancelado</string>
+    <string name="error_remote_returned_status">El receptor devolvió un error %1$d%2$s</string>
 </resource>
