@@ -28,4 +28,5 @@
     <string name="error_reserve_file_failed">No se pudo reservar el nombre del archivo</string>
     <string name="error_reception_cancelled">La recepción fue cancelada</string>
     <string name="error_save_file_failed">No se pudo guardar el archivo</string>
+    <string name="unnamed_file">Archivo_Sin_Nombre</string>
 </resource>
