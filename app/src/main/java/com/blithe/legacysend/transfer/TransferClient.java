@@ -178,7 +178,7 @@ public final class TransferClient {
         connection.setRequestProperty("Accept", "application/json");
         if (connection instanceof HttpsURLConnection) {
             HttpsURLConnection secure = (HttpsURLConnection) connection;
-            secure.setSSLSocketFactory(identity.createPinnedClientFactory(remote.getFingerprint()));
+            secure.setSSLSocketFactory(identity.createPinnedClientFactory(context, remote.getFingerprint()));
             secure.setHostnameVerifier(TlsIdentity.pinnedHostnameVerifier());
         }
         return connection;
