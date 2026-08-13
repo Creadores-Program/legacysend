@@ -14,4 +14,6 @@
     <string name="receive_finished">Recepción completada, archivo guardado en: %1$s</string>
     <string name="notif_receive_title">LegacySend está ejecutándose</string>
     <string name="notif_receive_text">Esperando archivos en la red local…</string>
+    <string name="error_discovery_failed">Error en el descubrimiento de dispositivos: %1$s</string>
+    <string name="error_announce_failed">Error al enviar el anuncio de dispositivo: %1$s</string>
 </resource>
