@@ -4,14 +4,14 @@ plugins {
 
 android {
     namespace 'com.blithe.legacysend'
-    compileSdk 34
+    compileSdk 20
 
     defaultConfig {
         applicationId 'com.blithe.legacysend'
         minSdk 9
         targetSdk 20
-        versionCode 4
-        versionName '1.2.2'
+        versionCode 5
+        versionName '1.3.0'
         testInstrumentationRunner 'android.test.InstrumentationTestRunner'
     }
 
@@ -22,10 +22,6 @@ android {
         }
     }
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
 
     lint {
         abortOnError true
@@ -33,9 +29,4 @@ android {
         // 本项目不是 Play 商店应用；target 28 用于保留 API 19 到旧式外部存储的一致语义。
         disable 'ExpiredTargetSdkVersion'
     }
-}
-
-dependencies {
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.json:json:20240303'
 }
