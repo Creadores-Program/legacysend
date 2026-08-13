@@ -12,4 +12,6 @@
     <string name="sending_to">正在发送到 %1$s（%2$d/%3$d）</string>
     <string name="receiving_from">正在接收来自 %1$s 的文件</string>
     <string name="receive_finished">接收完成，文件保存在：%1$s</string>>
+    <string name="notif_receive_title">旧版互传正在运行</string>
+    <string name="notif_receive_text">正在等待局域网文件…</string>
 </resource>
