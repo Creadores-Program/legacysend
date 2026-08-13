@@ -10,7 +10,7 @@ import org.json.JSONObject;
 import java.net.InetAddress;
 
 public final class DeviceInfo {
-    public static final String PROTOCOL_VERSION = "2.0";
+    public static final String PROTOCOL_VERSION = "2.2";
 
     private final String alias;
     private final String version;
