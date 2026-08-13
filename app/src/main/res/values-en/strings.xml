@@ -21,4 +21,11 @@
     <string name="error_cert_missing">Peer did not provide a valid SSL certificate.</string>
     <string name="error_cert_fingerprint_mismatch">Device SSL certificate fingerprint mismatch.</string>
     <string name="error_cert_verify_failed">Failed to verify the peer certificate fingerprint.</string>
+    <string name="error_server_accept_failed">Server exception: %1$s</string>
+    <string name="error_endpoint_not_found">Endpoint does not exist</string>
+    <string name="error_file_size_mismatch">File size mismatch</string>
+    <string name="error_create_directory_failed">Failed to create save directory</string>
+    <string name="error_reserve_file_failed">Failed to reserve target file name</string>
+    <string name="error_reception_cancelled">Reception was cancelled</string>
+    <string name="error_save_file_failed">Failed to save file</string>
 </resource>
