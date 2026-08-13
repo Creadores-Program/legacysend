@@ -1,3 +1,15 @@
 <resource>
     <string name="app_name">LegacySend</string>
+    <string name="default_device_alias">Dispositivo Android</string>
+    <string name="error_init_cert">Error al inicializar el certificado de seguridad: </string>
+    <string name="service_running">Servicio de recepción en ejecución · %1$s puerto %2$d</string>
+    <string name="service_stopped">Servicio de recepción detenido</string>
+    <string name="service_starting">Iniciando servicio de recepción…</string>
+    <string name="error_identity_timeout">Tiempo de espera agotado al inicializar la identidad del dispositivo</string>
+    <string name="error_start_failed">Error al iniciar: </string>
+    <string name="error_no_network">Red no conectada, por favor conéctate a Wi-Fi e intenta de nuevo</string>
+    <string name="error_not_initialized">La aplicación aún no ha completado la inicialización</string>
+    <string name="sending_to">Enviando a %1$s (%2$d/%3$d)</string>
+    <string name="receiving_from">Recibiendo archivos de %1$s</string>
+    <string name="receive_finished">Recepción completada, archivo guardado en: %1$s</string>
 </resource>
