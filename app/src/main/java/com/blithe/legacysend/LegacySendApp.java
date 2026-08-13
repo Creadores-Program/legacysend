@@ -18,6 +18,9 @@ import com.blithe.legacysend.server.IncomingSession;
 import com.blithe.legacysend.server.TransferServer;
 import com.blithe.legacysend.transfer.TransferClient;
 
+import org.conscrypt.Conscrypt;
+
+import java.security.Security;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +57,7 @@ public final class LegacySendApp extends Application implements DiscoveryManager
 
     @Override public void onCreate() {
         super.onCreate();
+        Security.insertProviderAt(Conscrypt.newProvider(), 1);
         background.execute(new Runnable() {
             @Override public void run() {
                 try {
