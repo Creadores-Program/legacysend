@@ -1,6 +1,9 @@
 plugins {
     id 'com.android.application'
 }
+dependencies {
+    implementation 'org.conscrypt:conscrypt-android:2.5.3'
+}
 
 android {
     namespace 'com.blithe.legacysend'
