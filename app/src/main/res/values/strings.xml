@@ -29,4 +29,12 @@
     <string name="error_reception_cancelled">接收已取消</string>
     <string name="error_save_file_failed">无法保存文件</string>
     <string name="unnamed_file">未命名文件</string>
+    <string name="error_no_files_selected">尚未选择文件</string>
+    <string name="msg_no_files_needed">对方无需接收这些文件</string>
+    <string name="error_recipient_rejected">接收方拒绝了传输</string>
+    <string name="error_cannot_read_file">无法读取文件：%1$s</string>
+    <string name="msg_files_sent_successfully">文件发送成功</string>
+    <string name="error_file_not_found_or_permission">无法读取所选文件，文件可能已被删除，或旧版文件选择器的权限已经失效</string>
+    <string name="msg_send_cancelled">发送已取消</string>
+    <string name="error_remote_returned_status">对方返回错误 %1$d%2$s</string>
 </resource>
