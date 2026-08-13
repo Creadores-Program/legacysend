@@ -1,5 +1,5 @@
 <resource>
-    <string name="app_name">旧版互传</string
+    <string name="app_name">旧版互传</string>
     <string name="default_device_alias">安卓设备</string>
     <string name="error_init_cert">初始化安全证书失败：</string>
     <string name="service_running">接收服务运行中 · %1$s 端口 %2$d</string>
