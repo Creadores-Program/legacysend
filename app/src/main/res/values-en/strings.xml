@@ -18,4 +18,7 @@
     <string name="error_announce_failed">Failed to send device announcement: %1$s</string>
     <string name="unknown_device">Unknown Device</string>
     <string name="unknown_address">Unknown Address</string>
+    <string name="error_cert_missing">Peer did not provide a valid SSL certificate.</string>
+    <string name="error_cert_fingerprint_mismatch">Device SSL certificate fingerprint mismatch.</string>
+    <string name="error_cert_verify_failed">Failed to verify the peer certificate fingerprint.</string>
 </resource>
