@@ -14,4 +14,6 @@
     <string name="receive_finished">Receive finished, file saved in: %1$s</string>
     <string name="notif_receive_title">LegacySend is running</string>
     <string name="notif_receive_text">Waiting for local network files…</string>
+    <string name="error_discovery_failed">Device discovery failed: %1$s</string>
+    <string name="error_announce_failed">Failed to send device announcement: %1$s</string>
 </resource>
