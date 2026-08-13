@@ -223,7 +223,17 @@ public final class TransferServer {
             respond(output, 409, "text/plain", new byte[0]);
             return;
         }
-        if (request.contentLength < 0 || request.contentLength != metadata.getSize()) {
+        if (!request.isChucked && (request.contentLength < 0 || request.contentLength != metadata.getSize())) {
+            respond(output, 400, "text/plain; charset=utf-8", context.getString(R.string.error_file_size_mismatch).getBytes(UTF8));
+            return;
+        }
+        long expectedBytes = metadata.getSize();
+        long copiedBytes = IoUtils.copy(input, output, expectedBytes, new IoUtils.ProgressListener() {
+            @Override
+            public void onBytes(long copied) throws IOException {}
+        });
+
+        if (copiedBytes != expectedBytes) {
             respond(output, 400, "text/plain; charset=utf-8", context.getString(R.string.error_file_size_mismatch).getBytes(UTF8));
             return;
         }
@@ -335,12 +345,14 @@ public final class TransferServer {
         final String path;
         final Map<String, String> query;
         final long contentLength;
+        final boolean isChunked
 
-        Request(String method, String path, Map<String, String> query, long contentLength) {
+        Request(String method, String path, Map<String, String> query, long contentLength, boolean isChucked) {
             this.method = method;
             this.path = path;
             this.query = query;
             this.contentLength = contentLength;
+            this.isChunked = isChunked;
         }
 
         static Request read(InputStream input) throws Exception {
@@ -360,8 +372,10 @@ public final class TransferServer {
             String path = question < 0 ? rawTarget : rawTarget.substring(0, question);
             Map<String, String> query = question < 0 ? new HashMap<String, String>()
                     : parseQuery(rawTarget.substring(question + 1));
+            String transferEncoding = headers.get("transfer-encoding");
+            boolean isChunked = transferEncoding != null && transferEncoding.toLowerCase(Locale.US).contains("chunked");
             long length = headers.containsKey("content-length")
-                    ? Long.parseLong((headers.get("content-length")).trim()) : -1L;
+                    ? Long.parseLong(headers.get("content-length")) : -1L;
             return new Request(parts[0], path, query, length);
         }
 
