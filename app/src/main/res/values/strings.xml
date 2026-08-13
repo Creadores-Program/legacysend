@@ -18,4 +18,7 @@
     <string name="error_announce_failed">发送设备公告失败：%1$s</string>
     <string name="unknown_device">未知设备</string>
     <string name="unknown_address">未知地址</string>
+    <string name="error_cert_missing">对方未提供有效的 SSL 证书。</string>
+    <string name="error_cert_fingerprint_mismatch">设备 SSL 证书指纹不匹配。</string>
+    <string name="error_cert_verify_failed">无法校验对方证书指纹。</string>
 </resource>
