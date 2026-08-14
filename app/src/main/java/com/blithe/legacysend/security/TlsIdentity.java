@@ -151,8 +151,10 @@ public final class TlsIdentity {
     }
 
     public SSLSocketFactory createPinnedClientFactory(Context context, String expectedFingerprint) throws Exception {
+        char[] pass = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) ? null : LOCAL_STORE_PASS;
+
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        kmf.init(keyStore, password);
+        kmf.init(keyStore, pass);
         final javax.net.ssl.X509KeyManager defaultKm = (javax.net.ssl.X509KeyManager) kmf.getKeyManagers()[0];
 
         javax.net.ssl.KeyManager[] customKeyManagers = new javax.net.ssl.KeyManager[] {
@@ -167,7 +169,7 @@ public final class TlsIdentity {
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                    return "legacysend";
+                    return ALIAS;
                 }
 
                 @Override
@@ -197,7 +199,19 @@ public final class TlsIdentity {
             }
         };
 
-        sslContext.init(customKeyManagers, trustManagers, new java.security.SecureRandom());
+        TrustManager[] trustManagers = new TrustManager[] { new FingerprintTrustManager(context, expectedFingerprint) };
+
+        SSLContext sslContext;
+        Provider conscryptProvider = Security.getProvider("Conscrypt");
+        if (conscryptProvider != null) {
+            sslContext = SSLContext.getInstance("TLS", conscryptProvider);
+        } else {
+            sslContext = SSLContext.getInstance("TLS");
+        }
+        
+        sslContext.init(customKeyManagers, trustManagers, new SecureRandom());
+
+        return new ModernTlsSocketFactory(sslContext.getSocketFactory());
     }
 
     public static HostnameVerifier pinnedHostnameVerifier() {
