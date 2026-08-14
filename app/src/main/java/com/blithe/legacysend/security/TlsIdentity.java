@@ -6,6 +6,8 @@ import android.security.KeyPairGeneratorSpec;
 
 import com.blithe.legacysend.R;
 
+import org.conscrypt.Conscrypt;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -18,7 +20,9 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.MessageDigest;
+import java.security.Provider;
 import java.security.SecureRandom;
+import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -123,7 +127,7 @@ public final class TlsIdentity {
         SSLServerSocketFactory factory = context.getServerSocketFactory();
         SSLServerSocket socket = (SSLServerSocket) factory.createServerSocket(port);
         socket.setReuseAddress(true);
-        socket.setWantClientAuth(true);
+        socket.setWantClientAuth(false);
         enableModernTls(socket);
         return socket;
     }
@@ -148,7 +152,14 @@ public final class TlsIdentity {
         char[] pass = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) ? null : LOCAL_STORE_PASS;
         keyManagers.init(keyStore, pass);
         
-        SSLContext context = SSLContext.getInstance("TLS");
+        SSLContext context;
+        Provider conscryptProvider = Security.getProvider("Conscrypt");
+        if (conscryptProvider != null) {
+            context = SSLContext.getInstance("TLS", conscryptProvider);
+        } else {
+            context = SSLContext.getInstance("TLS");
+        }
+        
         context.init(keyManagers.getKeyManagers(), new TrustManager[] { trustManager }, new SecureRandom());
         return context;
     }
@@ -171,16 +182,19 @@ public final class TlsIdentity {
     private static void enableModernTls(SSLServerSocket socket) {
         List<String> supported = Arrays.asList(socket.getSupportedProtocols());
         List<String> enabled = new ArrayList<String>();
-        for (String candidate : new String[] { "TLSv1.2", "TLSv1.1", "TLSv1" }) {
+        for (String candidate : new String[] { "TLSv1.3", "TLSv1.2" }) {
             if (supported.contains(candidate)) enabled.add(candidate);
         }
         if (!enabled.isEmpty()) socket.setEnabledProtocols(enabled.toArray(new String[enabled.size()]));
     }
 
     private static void enableModernTls(SSLSocket socket) {
+        if (Conscrypt.isConscrypt(socket)) {
+            Conscrypt.setUseEngineSocket(socket, true);
+        }
         List<String> supported = Arrays.asList(socket.getSupportedProtocols());
         List<String> enabled = new ArrayList<String>();
-        for (String candidate : new String[] { "TLSv1.3", "TLSv1.2", "TLSv1.1", "TLSv1" }) {
+        for (String candidate : new String[] { "TLSv1.3", "TLSv1.2" }) {
             if (supported.contains(candidate)) enabled.add(candidate);
         }
         if (!enabled.isEmpty()) socket.setEnabledProtocols(enabled.toArray(new String[enabled.size()]));
@@ -190,12 +204,6 @@ public final class TlsIdentity {
         if (chain == null || chain.length == 0) {
             throw new CertificateException("Peer did not provide a certificate");
         }
-        try {
-            chain[0].checkValidity();
-            chain[0].verify(chain[0].getPublicKey());
-        } catch (Exception error) {
-            throw new CertificateException("Peer certificate is invalid", error);
-        }
     }
 
     private static X509Certificate generateSelfSignedCertificateLegacy(KeyPair keyPair) throws Exception {
@@ -203,18 +211,10 @@ public final class TlsIdentity {
         Date endDate = new Date(startDate.getTime() + (20L * 365 * 24 * 60 * 60 * 1000));
         BigInteger serialNumber = new BigInteger(128, new SecureRandom()).abs().add(BigInteger.ONE);
         
-        X500Principal principal = new X500Principal("CN=LegacySend");
-        
-        javax.security.auth.x500.X500Principal subject = principal;
+        X500Principal subject = new X500Principal("CN=LegacySend");
         return (X509Certificate) java.security.cert.CertificateFactory.getInstance("X.509")
                 .generateCertificate(new java.io.ByteArrayInputStream(
-                        createSelfSignedCertBytes(keyPair, subject, startDate, endDate, serialNumber)));
-    }
-
-    private static byte[] createSelfSignedCertBytes(KeyPair keyPair, X500Principal subject,
-                                                     Date start, Date end, BigInteger serial) throws Exception {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        return certEncodingFallback(keyPair, subject, start, end, serial);
+                        certEncodingFallback(keyPair, subject, startDate, endDate, serialNumber)));
     }
 
     private static byte[] certEncodingFallback(KeyPair keyPair, X500Principal subject, Date start, Date end, BigInteger serial) throws Exception {
@@ -268,13 +268,15 @@ public final class TlsIdentity {
         }
     }
 
-    private static final class ModernTlsSocketFactory extends SSLSocketFactory {
+    public static final class ModernTlsSocketFactory extends SSLSocketFactory {
         private final SSLSocketFactory delegate;
 
-        ModernTlsSocketFactory(SSLSocketFactory delegate) { this.delegate = delegate; }
+        public ModernTlsSocketFactory(SSLSocketFactory delegate) { this.delegate = delegate; }
 
         private Socket configure(Socket socket) {
-            if (socket instanceof SSLSocket) enableModernTls((SSLSocket) socket);
+            if (socket instanceof SSLSocket) {
+                enableModernTls((SSLSocket) socket);
+            }
             return socket;
         }
 
