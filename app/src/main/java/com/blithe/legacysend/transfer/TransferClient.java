@@ -179,13 +179,13 @@ public final class TransferClient {
         Socket socket;
 
         if (isHttps) {
-            Socket underlyingSocket = new Socket();
-            underlyingSocket.connect(new InetSocketAddress(remote.getAddress(), remote.getPort()), 10000);
-            underlyingSocket.setSoTimeout(timeout);
-
             SSLSocketFactory factory = identity.createPinnedClientFactory(context, remote.getFingerprint());
-            String host = remote.getAddress().getHostAddress();
-            SSLSocket sslSocket = (SSLSocket) factory.createSocket(underlyingSocket, host, remote.getPort(), true);
+            
+            SSLSocket sslSocket = (SSLSocket) factory.createSocket();
+            
+            sslSocket.setUseClientMode(true);
+            sslSocket.connect(new InetSocketAddress(remote.getAddress(), remote.getPort()), 10000);
+            sslSocket.setSoTimeout(timeout);
             
             sslSocket.startHandshake();
             socket = sslSocket;
