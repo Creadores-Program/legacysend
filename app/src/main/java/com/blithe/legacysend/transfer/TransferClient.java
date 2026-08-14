@@ -180,13 +180,10 @@ public final class TransferClient {
 
         if (isHttps) {
             SSLSocketFactory factory = identity.createPinnedClientFactory(context, remote.getFingerprint());
+            String host = remote.getAddress().getHostAddress();
             
-            SSLSocket sslSocket = (SSLSocket) factory.createSocket();
-            
-            sslSocket.setUseClientMode(true);
-            sslSocket.connect(new InetSocketAddress(remote.getAddress(), remote.getPort()), 10000);
+            SSLSocket sslSocket = (SSLSocket) factory.createSocket(remote.getAddress(), remote.getPort());
             sslSocket.setSoTimeout(timeout);
-            
             sslSocket.startHandshake();
             socket = sslSocket;
         } else {
