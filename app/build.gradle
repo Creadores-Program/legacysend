@@ -17,6 +17,14 @@ android {
         versionName '1.3.0'
         testInstrumentationRunner 'android.test.InstrumentationTestRunner'
     }
+    signingConfigs {
+        debug {
+            storeFile file('LegacySend.keystore')
+            storePassword System.getenv("LEGACYSENDKEYCONTREAPP")
+            keyAlias "CreaSendLkey"
+            keyPassword System.getenv("LEGACYSENDKEYCONTREAPP")
+        }
+    }
 
     buildTypes {
         release {
