@@ -133,7 +133,7 @@ public final class TlsIdentity {
         SSLServerSocket socket = (SSLServerSocket) factory.createServerSocket(port);
         socket.setReuseAddress(true);
         socket.setWantClientAuth(false);
-        enableModernTls(socket);
+        enableModernTlsServer(socket);
         return socket;
     }
 
@@ -184,10 +184,16 @@ public final class TlsIdentity {
         return result.toString();
     }
 
-    private static void enableModernTls(SSLSocket socket) {
-        if (Conscrypt.isConscrypt(socket)) {
-            Conscrypt.setUseEngineSocket(socket, true);
+    private static void enableModernTlsServer(SSLServerSocket socket) {
+        List<String> supported = Arrays.asList(socket.getSupportedProtocols());
+        List<String> enabled = new ArrayList<String>();
+        for (String candidate : new String[] { "TLSv1.3", "TLSv1.2" }) {
+            if (supported.contains(candidate)) enabled.add(candidate);
         }
+        if (!enabled.isEmpty()) socket.setEnabledProtocols(enabled.toArray(new String[enabled.size()]));
+    }
+
+    private static void enableModernTlsClient(SSLSocket socket) {
         List<String> supported = Arrays.asList(socket.getSupportedProtocols());
         List<String> enabled = new ArrayList<String>();
         for (String candidate : new String[] { "TLSv1.3", "TLSv1.2" }) {
@@ -265,7 +271,7 @@ public final class TlsIdentity {
     }
 
     public static final class ModernTlsSocketFactory extends SSLSocketFactory {
-    private final SSLSocketFactory delegate;
+        private final SSLSocketFactory delegate;
 
         public ModernTlsSocketFactory(SSLSocketFactory delegate) { 
             this.delegate = delegate; 
@@ -273,10 +279,10 @@ public final class TlsIdentity {
                 Conscrypt.setUseEngineSocket(delegate, true);
             }
         }
-        
+
         private Socket configure(Socket socket) {
             if (socket instanceof SSLSocket) {
-                enableModernTls((SSLSocket) socket);
+                enableModernTlsClient((SSLSocket) socket);
             }
             return socket;
         }
