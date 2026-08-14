@@ -97,7 +97,9 @@ public final class TransferClient {
             activeSession = sessionId;
 
             long totalBytes = 0L;
-            for (TransferFile file : files) totalBytes += file.getSize();
+            for (int i = 0; i < files.size(); i++) {
+                totalBytes += files.get(i).getSize();
+            }
             long completedBefore = 0L;
 
             for (int index = 0; index < files.size(); index++) {
@@ -180,7 +182,6 @@ public final class TransferClient {
 
         if (isHttps) {
             SSLSocketFactory factory = identity.createPinnedClientFactory(context, remote.getFingerprint());
-            
             SSLSocket sslSocket = (SSLSocket) factory.createSocket(remote.getAddress(), remote.getPort());
             sslSocket.setSoTimeout(timeout);
             sslSocket.startHandshake();
@@ -255,7 +256,7 @@ public final class TransferClient {
     }
 
     private boolean isVersionGreaterOrEqual(String remoteVersion, String targetVersion) {
-        if (remoteVersion == null || remoteVersion.isEmpty()) {
+        if (remoteVersion == null || remoteVersion.trim().length() == 0) {
             return false;
         }
         try {
@@ -264,8 +265,8 @@ public final class TransferClient {
             
             int length = Math.max(remoteParts.length, targetParts.length);
             for (int i = 0; i < length; i++) {
-                int rVal = i < remoteParts.length ? Integer.parseInt(remoteParts[i].replaceAll("[^0-9]", "")) : 0;
-                int tVal = i < targetParts.length ? Integer.parseInt(targetParts[i].replaceAll("[^0-9]", "")) : 0;
+                int rVal = i < remoteParts.length ? parseVersionPart(remoteParts[i]) : 0;
+                int tVal = i < targetParts.length ? parseVersionPart(targetParts[i]) : 0;
                 if (rVal > tVal) return true;
                 if (rVal < tVal) return false;
             }
@@ -273,6 +274,19 @@ public final class TransferClient {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private int parseVersionPart(String part) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < part.length(); i++) {
+            char c = part.charAt(i);
+            if (c >= '0' && c <= '9') {
+                sb.append(c);
+            } else if (sb.length() > 0) {
+                break;
+            }
+        }
+        return sb.length() > 0 ? Integer.parseInt(sb.toString()) : 0;
     }
 
     private HttpResponse parseResponse(InputStream in) throws IOException {
