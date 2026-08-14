@@ -97,7 +97,9 @@ public final class TransferClient {
             activeSession = sessionId;
 
             long totalBytes = 0L;
-            for (TransferFile file : files) totalBytes += file.getSize();
+            for (int i = 0; i < files.size(); i++) {
+                totalBytes += files.get(i).getSize();
+            }
             long completedBefore = 0L;
 
             for (int index = 0; index < files.size(); index++) {
@@ -119,7 +121,7 @@ public final class TransferClient {
                 HttpResponse uploadResponse;
                 try {
                     uploadResponse = executeStreamRequest(remote, path, "POST", input, file.getSize(), 
-                            "application/octet-stream", 300000, new IoUtils.ProgressListener() {
+                            "application/octet-stream", 300000, isVersionGreaterOrEqual(remote.getVersion(), "2.2"), new IoUtils.ProgressListener() {
                                 @Override public void onBytes(long copied) throws IOException {
                                     checkCancelled();
                                     listener.onProgress(file.getFileName(), fileNumber, files.size(),
@@ -169,19 +171,17 @@ public final class TransferClient {
     private HttpResponse executeRequest(DeviceInfo remote, String path, String method, byte[] body,
                                        String contentType, int timeout, IoUtils.ProgressListener listener) throws Exception {
         return executeStreamRequest(remote, path, method, body != null ? new java.io.ByteArrayInputStream(body) : null,
-                body != null ? body.length : 0, contentType, timeout, listener);
+                body != null ? body.length : 0, contentType, timeout, false, listener);
     }
 
     private HttpResponse executeStreamRequest(DeviceInfo remote, String path, String method, InputStream bodyInput,
-                                              long bodyLength, String contentType, int timeout,
+                                              long bodyLength, String contentType, int timeout, boolean useChunked,
                                               IoUtils.ProgressListener listener) throws Exception {
         boolean isHttps = !"http".equalsIgnoreCase(remote.getProtocol());
         Socket socket;
 
         if (isHttps) {
             SSLSocketFactory factory = identity.createPinnedClientFactory(context, remote.getFingerprint());
-            String host = remote.getAddress().getHostAddress();
-            
             SSLSocket sslSocket = (SSLSocket) factory.createSocket(remote.getAddress(), remote.getPort());
             sslSocket.setSoTimeout(timeout);
             sslSocket.startHandshake();
@@ -197,25 +197,94 @@ public final class TransferClient {
         BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream(), 16 * 1024);
         BufferedInputStream in = new BufferedInputStream(socket.getInputStream(), 16 * 1024);
 
-        String headers = method + " " + path + " HTTP/1.1\r\n"
-                + "Host: " + remote.getAddress().getHostAddress() + ":" + remote.getPort() + "\r\n"
-                + "User-Agent: LegacySend\r\n"
-                + "Accept: application/json\r\n"
-                + "Content-Type: " + contentType + "\r\n"
-                + "Content-Length: " + bodyLength + "\r\n"
-                + "Connection: close\r\n\r\n";
+        StringBuilder headersBuilder = new StringBuilder();
+        headersBuilder.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
+        headersBuilder.append("Host: ").append(remote.getAddress().getHostAddress()).append(":").append(remote.getPort()).append("\r\n");
+        headersBuilder.append("User-Agent: LegacySend\r\n");
+        headersBuilder.append("Accept: application/json\r\n");
+        headersBuilder.append("Content-Type: ").append(contentType).append("\r\n");
 
-        out.write(headers.getBytes(UTF8));
+        if (useChunked) {
+            headersBuilder.append("Transfer-Encoding: chunked\r\n");
+        } else {
+            headersBuilder.append("Content-Length: ").append(bodyLength).append("\r\n");
+        }
+        
+        headersBuilder.append("Connection: close\r\n\r\n");
+
+        out.write(headersBuilder.toString().getBytes(UTF8));
 
         if (bodyInput != null && bodyLength > 0) {
-            IoUtils.copy(bodyInput, out, bodyLength, listener);
+            if (useChunked) {
+                writeChunkedBody(bodyInput, out, listener);
+            } else {
+                IoUtils.copy(bodyInput, out, bodyLength, listener);
+            }
         } else {
+            if (useChunked) {
+                out.write("0\r\n\r\n".getBytes(UTF8));
+            }
             out.flush();
         }
 
         HttpResponse response = parseResponse(in);
         socket.close();
         return response;
+    }
+
+    private void writeChunkedBody(InputStream input, OutputStream output, IoUtils.ProgressListener listener) throws IOException {
+        byte[] buffer = new byte[8192];
+        long totalCopied = 0;
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            if (read > 0) {
+                String chunkHeader = Integer.toHexString(read) + "\r\n";
+                output.write(chunkHeader.getBytes(UTF8));
+                output.write(buffer, 0, read);
+                output.write("\r\n".getBytes(UTF8));
+                
+                totalCopied += read;
+                if (listener != null) {
+                    listener.onBytes(totalCopied);
+                }
+            }
+        }
+        output.write("0\r\n\r\n".getBytes(UTF8));
+        output.flush();
+    }
+
+    private boolean isVersionGreaterOrEqual(String remoteVersion, String targetVersion) {
+        if (remoteVersion == null || remoteVersion.trim().length() == 0) {
+            return false;
+        }
+        try {
+            String[] remoteParts = remoteVersion.split("\\.");
+            String[] targetParts = targetVersion.split("\\.");
+            
+            int length = Math.max(remoteParts.length, targetParts.length);
+            for (int i = 0; i < length; i++) {
+                int rVal = i < remoteParts.length ? parseVersionPart(remoteParts[i]) : 0;
+                int tVal = i < targetParts.length ? parseVersionPart(targetParts[i]) : 0;
+                if (rVal > tVal) return true;
+                if (rVal < tVal) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private int parseVersionPart(String part) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < part.length(); i++) {
+            char c = part.charAt(i);
+            if (c >= '0' && c <= '9') {
+                sb.append(c);
+            } else if (sb.length() > 0) {
+                break;
+            }
+        }
+        return sb.length() > 0 ? Integer.parseInt(sb.toString()) : 0;
     }
 
     private HttpResponse parseResponse(InputStream in) throws IOException {
