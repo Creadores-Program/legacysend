@@ -151,8 +151,53 @@ public final class TlsIdentity {
     }
 
     public SSLSocketFactory createPinnedClientFactory(Context context, String expectedFingerprint) throws Exception {
-        SSLContext sslContext = createContext(new FingerprintTrustManager(context, expectedFingerprint));
-        return new ModernTlsSocketFactory(sslContext.getSocketFactory());
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStore, password);
+        final javax.net.ssl.X509KeyManager defaultKm = (javax.net.ssl.X509KeyManager) kmf.getKeyManagers()[0];
+
+        javax.net.ssl.KeyManager[] customKeyManagers = new javax.net.ssl.KeyManager[] {
+            new javax.net.ssl.X509KeyManager() {
+                @Override
+                public String chooseClientAlias(String[] keyType, java.security.Principal[] issuers, java.net.Socket socket) {
+                    try {
+                        java.util.Enumeration<String> aliases = keyStore.aliases();
+                        if (aliases.hasMoreElements()) {
+                            return aliases.nextElement();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    return "legacysend";
+                }
+
+                @Override
+                public String chooseServerAlias(String keyType, java.security.Principal[] issuers, java.net.Socket socket) {
+                    return defaultKm.chooseServerAlias(keyType, issuers, socket);
+                }
+
+                @Override
+                public java.security.cert.X509Certificate[] getCertificateChain(String alias) {
+                    return defaultKm.getCertificateChain(alias);
+                }
+
+                @Override
+                public String[] getClientAliases(String keyType, java.security.Principal[] issuers) {
+                    return defaultKm.getClientAliases(keyType, issuers);
+                }
+
+                @Override
+                public java.security.PrivateKey getPrivateKey(String alias) {
+                    return defaultKm.getPrivateKey(alias);
+                }
+
+                @Override
+                public String[] getServerAliases(String keyType, java.security.Principal[] issuers) {
+                    return defaultKm.getServerAliases(keyType, issuers);
+                }
+            }
+        };
+
+        sslContext.init(customKeyManagers, trustManagers, new java.security.SecureRandom());
     }
 
     public static HostnameVerifier pinnedHostnameVerifier() {
