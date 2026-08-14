@@ -29,11 +29,11 @@ jobs:
 
       - name: Perms Gradle
         run: chmod 777 gradlew
-#      - name: Set Key
-#        run: echo "${{ secrets.LEGACYSENDKEYAPPB }}" | base64 -d > app/LegacySend.keystore
+      - name: Set Key
+        run: echo "${{ secrets.LEGACYSENDKEYAPPB }}" | base64 -d > app/LegacySend.keystore
       - name: Build App
-#        env:
-#          LEGACYSENDKEYCONTREAPP: ${{ secrets.LEGACYSENDKEYCONTREAPP }}
+        env:
+          LEGACYSENDKEYCONTREAPP: ${{ secrets.LEGACYSENDKEYCONTREAPP }}
         run: ./gradlew :app:assembleDebug --no-daemon
 #      - name: Enable KVM group perms
 #        run: |
