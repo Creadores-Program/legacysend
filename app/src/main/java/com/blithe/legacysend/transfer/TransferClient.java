@@ -12,19 +12,25 @@ import com.blithe.legacysend.util.IoUtils;
 
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 public final class TransferClient {
     public interface Listener {
@@ -39,7 +45,7 @@ public final class TransferClient {
     private final TlsIdentity identity;
     private final DeviceInfo self;
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
-    private volatile HttpURLConnection activeConnection;
+    private volatile Socket activeSocket;
     private volatile String activeSession;
     private volatile DeviceInfo activeDevice;
 
@@ -51,14 +57,15 @@ public final class TransferClient {
     }
 
     public DeviceInfo register(DeviceInfo remote) throws Exception {
-        HttpURLConnection connection = open(remote, "/api/localsend/v2/register", "POST", 10000);
         JSONObject registration = self.toJson(false, true);
         registration.remove("announce");
-        writeJson(connection, registration);
-        int status = connection.getResponseCode();
-        if (status / 100 != 2) throw statusError(connection, status);
-        JSONObject response = new JSONObject(readText(connection.getInputStream()));
-        return DeviceInfo.fromJson(context, response, remote.getAddress());
+        
+        HttpResponse response = executeRequest(remote, "/api/localsend/v2/register", "POST", 
+                registration.toString().getBytes(UTF8), "application/json; charset=utf-8", 10000, null);
+
+        if (response.statusCode / 100 != 2) throw statusError(response);
+        JSONObject jsonResponse = new JSONObject(new String(response.body, UTF8));
+        return DeviceInfo.fromJson(context, jsonResponse, remote.getAddress());
     }
 
     public void send(DeviceInfo remote, List<TransferFile> files, Listener listener) {
@@ -69,10 +76,12 @@ public final class TransferClient {
             if (files == null || files.isEmpty()) {
                 throw new IOException(context.getString(R.string.error_no_files_selected));
             }
-            HttpURLConnection prepare = open(remote, "/api/localsend/v2/prepare-upload", "POST", 300000);
-            activeConnection = prepare;
-            writeJson(prepare, ProtocolJson.prepareUpload(self, files));
-            int prepareStatus = prepare.getResponseCode();
+
+            byte[] prepareBody = ProtocolJson.prepareUpload(self, files).toString().getBytes(UTF8);
+            HttpResponse prepareResponse = executeRequest(remote, "/api/localsend/v2/prepare-upload", "POST",
+                    prepareBody, "application/json; charset=utf-8", 300000, null);
+
+            int prepareStatus = prepareResponse.statusCode;
             if (prepareStatus == 204) {
                 listener.onFinished(context.getString(R.string.msg_no_files_needed));
                 return;
@@ -80,8 +89,9 @@ public final class TransferClient {
             if (prepareStatus == 403) {
                 throw new IOException(context.getString(R.string.error_recipient_rejected));
             }
-            if (prepareStatus / 100 != 2) throw statusError(prepare, prepareStatus);
-            JSONObject response = new JSONObject(readText(prepare.getInputStream()));
+            if (prepareStatus / 100 != 2) throw statusError(prepareResponse);
+
+            JSONObject response = new JSONObject(new String(prepareResponse.body, UTF8));
             String sessionId = response.getString("sessionId");
             JSONObject tokens = response.getJSONObject("files");
             activeSession = sessionId;
@@ -89,44 +99,41 @@ public final class TransferClient {
             long totalBytes = 0L;
             for (TransferFile file : files) totalBytes += file.getSize();
             long completedBefore = 0L;
+
             for (int index = 0; index < files.size(); index++) {
                 checkCancelled();
                 final TransferFile file = files.get(index);
                 String token = tokens.getString(file.getId());
                 String path = "/api/localsend/v2/upload?sessionId=" + encode(sessionId)
                         + "&fileId=" + encode(file.getId()) + "&token=" + encode(token);
-                HttpURLConnection upload = open(remote, path, "POST", 300000);
-                activeConnection = upload;
-                upload.setRequestProperty("Content-Type", "application/octet-stream");
-                upload.setDoOutput(true);
-                upload.setFixedLengthStreamingMode(file.getSize());
+
                 final long prior = completedBefore;
                 final long total = totalBytes;
                 final int fileNumber = index + 1;
+
                 InputStream input = resolver.openInputStream(file.getUri());
                 if (input == null) {
                     throw new IOException(context.getString(R.string.error_cannot_read_file, file.getFileName()));
                 }
+
+                HttpResponse uploadResponse;
                 try {
-                    OutputStream output = upload.getOutputStream();
-                    try {
-                        IoUtils.copy(input, output, file.getSize(), new IoUtils.ProgressListener() {
-                            @Override public void onBytes(long copied) throws IOException {
-                                checkCancelled();
-                                listener.onProgress(file.getFileName(), fileNumber, files.size(),
-                                        IoUtils.percent(prior + copied, total));
-                            }
-                        });
-                    } finally {
-                        output.close();
-                    }
+                    uploadResponse = executeStreamRequest(remote, path, "POST", input, file.getSize(), 
+                            "application/octet-stream", 300000, new IoUtils.ProgressListener() {
+                                @Override public void onBytes(long copied) throws IOException {
+                                    checkCancelled();
+                                    listener.onProgress(file.getFileName(), fileNumber, files.size(),
+                                            IoUtils.percent(prior + copied, total));
+                                }
+                            });
                 } finally {
                     input.close();
                 }
-                int uploadStatus = upload.getResponseCode();
-                if (uploadStatus / 100 != 2) throw statusError(upload, uploadStatus);
+
+                if (uploadResponse.statusCode / 100 != 2) throw statusError(uploadResponse);
                 completedBefore += file.getSize();
             }
+
             listener.onProgress(files.get(files.size() - 1).getFileName(), files.size(), files.size(), 100);
             listener.onFinished(context.getString(R.string.msg_files_sent_successfully));
         } catch (Exception error) {
@@ -136,9 +143,7 @@ public final class TransferClient {
             }
             listener.onFailed(cancelled.get() ? context.getString(R.string.msg_send_cancelled) : message);
         } finally {
-            HttpURLConnection connection = activeConnection;
-            if (connection != null) connection.disconnect();
-            activeConnection = null;
+            closeActiveSocket();
             activeSession = null;
             activeDevice = null;
         }
@@ -146,69 +151,163 @@ public final class TransferClient {
 
     public void cancel() {
         cancelled.set(true);
-        HttpURLConnection connection = activeConnection;
-        if (connection != null) connection.disconnect();
+        closeActiveSocket();
         final String session = activeSession;
         final DeviceInfo device = activeDevice;
         if (session != null && device != null) {
             new Thread(new Runnable() {
                 @Override public void run() {
                     try {
-                        HttpURLConnection cancel = open(device,
-                                "/api/localsend/v2/cancel?sessionId=" + encode(session), "POST", 5000);
-                        cancel.setFixedLengthStreamingMode(0);
-                        cancel.setDoOutput(true);
-                        cancel.getResponseCode();
-                        cancel.disconnect();
+                        executeRequest(device, "/api/localsend/v2/cancel?sessionId=" + encode(session),
+                                "POST", new byte[0], "text/plain", 5000, null);
                     } catch (Exception ignored) {}
                 }
             }, "LegacySend-cancel").start();
         }
     }
 
-    private HttpURLConnection open(DeviceInfo remote, String path, String method, int readTimeout)
-            throws Exception {
-        String scheme = "http".equalsIgnoreCase(remote.getProtocol()) ? "http" : "https";
-        URL url = new URL(scheme, remote.getAddress().getHostAddress(), remote.getPort(), path);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod(method);
-        connection.setConnectTimeout(10000);
-        connection.setReadTimeout(readTimeout);
-        connection.setUseCaches(false);
-        connection.setRequestProperty("Accept", "application/json");
-        if (connection instanceof HttpsURLConnection) {
-            HttpsURLConnection secure = (HttpsURLConnection) connection;
-            secure.setSSLSocketFactory(identity.createPinnedClientFactory(context, remote.getFingerprint()));
-            secure.setHostnameVerifier(TlsIdentity.pinnedHostnameVerifier());
+    private HttpResponse executeRequest(DeviceInfo remote, String path, String method, byte[] body,
+                                       String contentType, int timeout, IoUtils.ProgressListener listener) throws Exception {
+        return executeStreamRequest(remote, path, method, body != null ? new java.io.ByteArrayInputStream(body) : null,
+                body != null ? body.length : 0, contentType, timeout, listener);
+    }
+
+    private HttpResponse executeStreamRequest(DeviceInfo remote, String path, String method, InputStream bodyInput,
+                                              long bodyLength, String contentType, int timeout,
+                                              IoUtils.ProgressListener listener) throws Exception {
+        boolean isHttps = !"http".equalsIgnoreCase(remote.getProtocol());
+        Socket socket;
+
+        if (isHttps) {
+            SSLSocketFactory factory = identity.createPinnedClientFactory(context, remote.getFingerprint());
+            SSLSocket sslSocket = (SSLSocket) factory.createSocket();
+            sslSocket.connect(new InetSocketAddress(remote.getAddress(), remote.getPort()), 10000);
+            sslSocket.setSoTimeout(timeout);
+            sslSocket.startHandshake();
+            socket = sslSocket;
+        } else {
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(remote.getAddress(), remote.getPort()), 10000);
+            socket.setSoTimeout(timeout);
         }
-        return connection;
+
+        activeSocket = socket;
+
+        BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream(), 16 * 1024);
+        BufferedInputStream in = new BufferedInputStream(socket.getInputStream(), 16 * 1024);
+
+        // Escribir Headers HTTP manuales
+        String headers = method + " " + path + " HTTP/1.1\r\n"
+                + "Host: " + remote.getAddress().getHostAddress() + ":" + remote.getPort() + "\r\n"
+                + "User-Agent: LegacySend\r\n"
+                + "Accept: application/json\r\n"
+                + "Content-Type: " + contentType + "\r\n"
+                + "Content-Length: " + bodyLength + "\r\n"
+                + "Connection: close\r\n\r\n";
+
+        out.write(headers.getBytes(UTF8));
+
+        if (bodyInput != null && bodyLength > 0) {
+            IoUtils.copy(bodyInput, out, bodyLength, listener);
+        } else {
+            out.flush();
+        }
+
+        // Leer Respuesta HTTP
+        HttpResponse response = parseResponse(in);
+        socket.close();
+        return response;
     }
 
-    private static void writeJson(HttpURLConnection connection, JSONObject json) throws IOException {
-        byte[] bytes = json.toString().getBytes(UTF8);
-        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        connection.setDoOutput(true);
-        connection.setFixedLengthStreamingMode(bytes.length);
-        OutputStream output = connection.getOutputStream();
-        try { output.write(bytes); } finally { output.close(); }
+    private HttpResponse parseResponse(InputStream in) throws IOException {
+        String statusLine = readLine(in);
+        String[] parts = statusLine.split(" ");
+        int statusCode = 500;
+        if (parts.length >= 2) {
+            try { statusCode = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
+        }
+
+        Map<String, String> headers = new HashMap<String, String>();
+        long contentLength = -1;
+        boolean chunked = false;
+
+        while (true) {
+            String line = readLine(in);
+            if (line.length() == 0) break;
+            int colon = line.indexOf(':');
+            if (colon > 0) {
+                String key = line.substring(0, colon).trim().toLowerCase(Locale.US);
+                String val = line.substring(colon + 1).trim();
+                headers.put(key, val);
+                if ("content-length".equals(key)) {
+                    try { contentLength = Long.parseLong(val); } catch (Exception ignored) {}
+                } else if ("transfer-encoding".equals(key) && val.toLowerCase(Locale.US).contains("chunked")) {
+                    chunked = true;
+                }
+            }
+        }
+
+        ByteArrayOutputStream bodyStream = new ByteArrayOutputStream();
+        if (chunked) {
+            // Lectura básica para respuestas chunked pequeñas
+            while (true) {
+                String chunkSizeHex = readLine(in);
+                int semicolon = chunkSizeHex.indexOf(';');
+                if (semicolon >= 0) chunkSizeHex = chunkSizeHex.substring(0, semicolon);
+                int size = Integer.parseInt(chunkSizeHex.trim(), 16);
+                if (size == 0) {
+                    readLine(in); // consumir CRLF final
+                    break;
+                }
+                byte[] chunk = new byte[size];
+                int readTotal = 0;
+                while (readTotal < size) {
+                    int r = in.read(chunk, readTotal, size - readTotal);
+                    if (r < 0) break;
+                    readTotal += r;
+                }
+                bodyStream.write(chunk, 0, readTotal);
+                readLine(in); // consumir CRLF del chunk
+            }
+        } else if (contentLength >= 0) {
+            IoUtils.copy(in, bodyStream, contentLength, null);
+        } else {
+            IoUtils.copy(in, bodyStream, -1, null);
+        }
+
+        return new HttpResponse(statusCode, bodyStream.toByteArray());
     }
 
-    private IOException statusError(HttpURLConnection connection, int status) {
-        String message = "";
-        try {
-            InputStream error = connection.getErrorStream();
-            if (error != null) message = readText(error);
-        } catch (Exception ignored) {}
+    private static String readLine(InputStream input) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int previous = -1;
+        while (output.size() <= 8192) {
+            int current = input.read();
+            if (current < 0) throw new IOException("HTTP response ended prematurely");
+            if (previous == '\r' && current == '\n') {
+                byte[] bytes = output.toByteArray();
+                return new String(bytes, 0, Math.max(0, bytes.length - 1), UTF8);
+            }
+            output.write(current);
+            previous = current;
+        }
+        throw new IOException("HTTP response line too long");
+    }
+
+    private void closeActiveSocket() {
+        Socket socket = activeSocket;
+        if (socket != null) {
+            try { socket.close(); } catch (IOException ignored) {}
+            activeSocket = null;
+        }
+    }
+
+    private IOException statusError(HttpResponse response) {
+        String message = new String(response.body, UTF8);
         if (message.length() > 160) message = message.substring(0, 160);
-        String formatted = context.getString(R.string.error_remote_returned_status, status,
+        String formatted = context.getString(R.string.error_remote_returned_status, response.statusCode,
                 message.length() == 0 ? "" : ": " + message);
         return new IOException(formatted);
-    }
-
-    private static String readText(InputStream input) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        IoUtils.copy(input, output, -1, null);
-        return new String(output.toByteArray(), UTF8);
     }
 
     private static String encode(String value) throws Exception {
@@ -224,5 +323,15 @@ public final class TransferClient {
     private static String readable(Exception error) {
         String message = error.getMessage();
         return message == null || message.length() == 0 ? error.getClass().getSimpleName() : message;
+    }
+
+    private static final class HttpResponse {
+        final int statusCode;
+        final byte[] body;
+
+        HttpResponse(int statusCode, byte[] body) {
+            this.statusCode = statusCode;
+            this.body = body;
+        }
     }
 }
