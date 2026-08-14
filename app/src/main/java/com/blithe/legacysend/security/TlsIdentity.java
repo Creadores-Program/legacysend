@@ -185,15 +185,6 @@ public final class TlsIdentity {
     }
 
     private static void enableModernTls(SSLSocket socket) {
-        List<String> supported = Arrays.asList(socket.getSupportedProtocols());
-        List<String> enabled = new ArrayList<String>();
-        for (String candidate : new String[] { "TLSv1.3", "TLSv1.2" }) {
-            if (supported.contains(candidate)) enabled.add(candidate);
-        }
-        if (!enabled.isEmpty()) socket.setEnabledProtocols(enabled.toArray(new String[enabled.size()]));
-    }
-
-    private static void enableModernTls(SSLSocket socket) {
         if (Conscrypt.isConscrypt(socket)) {
             Conscrypt.setUseEngineSocket(socket, true);
         }
