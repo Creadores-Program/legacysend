@@ -8,6 +8,7 @@ import com.blithe.legacysend.R;
 
 import org.conscrypt.Conscrypt;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,6 +24,7 @@ import java.security.Provider;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -84,17 +86,22 @@ public final class TlsIdentity {
             certificate = (X509Certificate) store.getCertificate(ALIAS);
         } else {
             File storeFile = new File(context.getFilesDir(), LOCAL_STORE_FILE);
-            store = KeyStore.getInstance("PKCS12");
+            store = KeyStore.getInstance("BKS");
 
             if (storeFile.exists()) {
                 FileInputStream fis = null;
                 try {
                     fis = new FileInputStream(storeFile);
                     store.load(fis, LOCAL_STORE_PASS);
+                } catch (Exception e) {
+                    storeFile.delete();
+                    store.load(null, null);
                 } finally {
                     if (fis != null) try { fis.close(); } catch (IOException ignored) {}
                 }
-            } else {
+            }
+            
+            if (!store.containsAlias(ALIAS)) {
                 store.load(null, null);
                 KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
                 kpg.initialize(2048, new SecureRandom());
@@ -210,18 +217,18 @@ public final class TlsIdentity {
     }
 
     private static X509Certificate generateSelfSignedCertificateLegacy(KeyPair keyPair) throws Exception {
-        Date startDate = new Date();
-        Date endDate = new Date(startDate.getTime() + (20L * 365 * 24 * 60 * 60 * 1000));
-        BigInteger serialNumber = new BigInteger(128, new SecureRandom()).abs().add(BigInteger.ONE);
+        org.bouncycastle.x509.X509V3CertificateGenerator certGen = new org.bouncycastle.x509.X509V3CertificateGenerator();
+        X500Principal dnName = new X500Principal("CN=LegacySend");
         
-        X500Principal subject = new X500Principal("CN=LegacySend");
-        return (X509Certificate) java.security.cert.CertificateFactory.getInstance("X.509")
-                .generateCertificate(new java.io.ByteArrayInputStream(
-                        certEncodingFallback(keyPair, subject, startDate, endDate, serialNumber)));
-    }
+        certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
+        certGen.setSubjectDN(dnName);
+        certGen.setIssuerDN(dnName);
+        certGen.setNotBefore(new Date(System.currentTimeMillis() - 86400000L));
+        certGen.setNotAfter(new Date(System.currentTimeMillis() + (20L * 365 * 24 * 60 * 60 * 1000)));
+        certGen.setPublicKey(keyPair.getPublic());
+        certGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
 
-    private static byte[] certEncodingFallback(KeyPair keyPair, X500Principal subject, Date start, Date end, BigInteger serial) throws Exception {
-        return keyPair.getPublic().getEncoded();
+        return certGen.generate(keyPair.getPrivate(), "BC");
     }
 
     private static final class AcceptAllTrustManager implements X509TrustManager {
