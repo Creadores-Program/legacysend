@@ -86,7 +86,7 @@ public final class TlsIdentity {
             certificate = (X509Certificate) store.getCertificate(ALIAS);
         } else {
             File storeFile = new File(context.getFilesDir(), LOCAL_STORE_FILE);
-            store = KeyStore.getInstance("BKS");
+            store = KeyStore.getInstance("PKCS12");
 
             if (storeFile.exists()) {
                 FileInputStream fis = null;
@@ -217,18 +217,19 @@ public final class TlsIdentity {
     }
 
     private static X509Certificate generateSelfSignedCertificateLegacy(KeyPair keyPair) throws Exception {
-        org.bouncycastle.x509.X509V3CertificateGenerator certGen = new org.bouncycastle.x509.X509V3CertificateGenerator();
-        X500Principal dnName = new X500Principal("CN=LegacySend");
-        
-        certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
-        certGen.setSubjectDN(dnName);
-        certGen.setIssuerDN(dnName);
-        certGen.setNotBefore(new Date(System.currentTimeMillis() - 86400000L));
-        certGen.setNotAfter(new Date(System.currentTimeMillis() + (20L * 365 * 24 * 60 * 60 * 1000)));
-        certGen.setPublicKey(keyPair.getPublic());
-        certGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
+        Date startDate = new Date();
+        Date endDate = new Date(startDate.getTime() + (20L * 365 * 24 * 60 * 60 * 1000));
+        BigInteger serialNumber = BigInteger.valueOf(System.currentTimeMillis());
 
-        return certGen.generate(keyPair.getPrivate(), "BC");
+        byte[] pubKeyBytes = keyPair.getPublic().getEncoded();
+        
+        java.security.Signature sig = java.security.Signature.getInstance("SHA256withRSA");
+        sig.initSign(keyPair.getPrivate());
+        sig.update(pubKeyBytes);
+        byte[] signatureBytes = sig.sign();
+
+        CertificateFactory fact = CertificateFactory.getInstance("X.509");
+        return (X509Certificate) fact.generateCertificate(new ByteArrayInputStream(pubKeyBytes));
     }
 
     private static final class AcceptAllTrustManager implements X509TrustManager {
