@@ -17,6 +17,7 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -214,33 +215,28 @@ public final class TransferServer {
         String token = request.query.get("token");
         IncomingSession session = sessions.get(sessionId);
         final TransferFile metadata = session == null ? null : session.findFile(fileId);
+
         if (session == null || metadata == null || token == null || !token.equals(session.getToken(fileId))
                 || !sameAddress(session.getSenderAddress(), socket.getInetAddress())) {
             respond(output, 403, "text/plain", new byte[0]);
             return;
         }
+
         if (session.getDecision() == IncomingSession.Decision.CANCELLED) {
             respond(output, 409, "text/plain", new byte[0]);
             return;
         }
-        if (!request.isChunked && (request.contentLength < 0 || request.contentLength != metadata.getSize())) {
-            respond(output, 400, "text/plain; charset=utf-8", context.getString(R.string.error_file_size_mismatch).getBytes(UTF8));
-            return;
-        }
-        long expectedBytes = metadata.getSize();
-        long copiedBytes = IoUtils.copy(input, output, expectedBytes, new IoUtils.ProgressListener() {
-            @Override
-            public void onBytes(long copied) throws IOException {}
-        });
 
-        if (copiedBytes != expectedBytes) {
+        if (!request.isChunked && request.contentLength >= 0 && request.contentLength != metadata.getSize()) {
             respond(output, 400, "text/plain; charset=utf-8", context.getString(R.string.error_file_size_mismatch).getBytes(UTF8));
             return;
         }
+
         File directory = StorageUtils.receiveDirectory(context);
         if (!directory.exists() && !directory.mkdirs()) {
             throw new IOException(context.getString(R.string.error_create_directory_failed));
         }
+
         final File target;
         synchronized (StorageUtils.class) {
             target = StorageUtils.uniqueFile(context, directory, metadata.getFileName());
@@ -248,12 +244,17 @@ public final class TransferServer {
                 throw new IOException(context.getString(R.string.error_reserve_file_failed));
             }
         }
+
         final File temporary = new File(directory, "." + target.getName() + "." + sessionId + ".part");
+        InputStream payloadInput = request.isChunked ? new ChunkedInputStream(input) : input;
+
         try {
             FileOutputStream fileOutput = new FileOutputStream(temporary);
+            long bytesToRead = metadata.getSize();
+
             try {
                 final IncomingSession currentSession = session;
-                IoUtils.copy(input, fileOutput, request.contentLength, new IoUtils.ProgressListener() {
+                IoUtils.copy(payloadInput, fileOutput, bytesToRead, new IoUtils.ProgressListener() {
                     @Override public void onBytes(long copied) throws IOException {
                         if (currentSession.getDecision() == IncomingSession.Decision.CANCELLED) {
                             throw new IOException(context.getString(R.string.error_reception_cancelled));
@@ -266,15 +267,23 @@ public final class TransferServer {
             } finally {
                 fileOutput.close();
             }
+
+            if (temporary.length() != metadata.getSize()) {
+                throw new IOException(context.getString(R.string.error_file_size_mismatch));
+            }
+
             synchronized (StorageUtils.class) {
                 if (!target.delete() || !temporary.renameTo(target)) {
                     throw new IOException(context.getString(R.string.error_save_file_failed));
                 }
             }
+
             session.getReceivedBytes().addAndGet(metadata.getSize());
             Set<String> done = completedFiles.get(sessionId);
             if (done != null) done.add(fileId);
+
             respond(output, 200, "text/plain", new byte[0]);
+
             if (done != null && done.size() == session.getFiles().size()) {
                 sessions.remove(sessionId);
                 completedFiles.remove(sessionId);
@@ -340,6 +349,69 @@ public final class TransferServer {
         return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
     }
 
+    private static final class ChunkedInputStream extends FilterInputStream {
+        private long chunkSize = 0;
+        private boolean closed = false;
+
+        protected ChunkedInputStream(InputStream in) {
+            super(in);
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] b = new byte[1];
+            int res = read(b, 0, 1);
+            return res == -1 ? -1 : (b[0] & 0xFF);
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (closed) return -1;
+            if (chunkSize == 0) {
+                readChunkHeader();
+                if (chunkSize == 0) {
+                    closed = true;
+                    readCRLF();
+                    return -1;
+                }
+            }
+
+            int bytesToRead = (int) Math.min(len, chunkSize);
+            int bytesRead = in.read(b, off, bytesToRead);
+            if (bytesRead == -1) {
+                throw new IOException("Premature EOF inside chunk body");
+            }
+
+            chunkSize -= bytesRead;
+            if (chunkSize == 0) {
+                readCRLF();
+            }
+
+            return bytesRead;
+        }
+
+        private void readChunkHeader() throws IOException {
+            String line = Request.readLine(in);
+            int semicolon = line.indexOf(';');
+            if (semicolon >= 0) {
+                line = line.substring(0, semicolon);
+            }
+            try {
+                chunkSize = Long.parseLong(line.trim(), 16);
+            } catch (NumberFormatException e) {
+                throw new IOException("Invalid chunk header size: " + line);
+            }
+        }
+
+        private void readCRLF() throws IOException {
+            int cr = in.read();
+            int lf = in.read();
+            if (cr != '\r' || lf != '\n') {
+                throw new IOException("Corrupted chunked encoding (missing CRLF)");
+            }
+        }
+    }
+
     private static final class Request {
         final String method;
         final String path;
@@ -389,7 +461,7 @@ public final class TransferServer {
             return result;
         }
 
-        private static String readLine(InputStream input) throws IOException {
+        static String readLine(InputStream input) throws IOException {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             int previous = -1;
             while (output.size() <= 8192) {
