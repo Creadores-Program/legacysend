@@ -125,6 +125,11 @@ public final class TlsIdentity {
     public SSLServerSocket createServerSocket(int port) throws Exception {
         SSLContext context = createContext(new AcceptAllTrustManager());
         SSLServerSocketFactory factory = context.getServerSocketFactory();
+
+        if (Conscrypt.isConscrypt(factory)) {
+            Conscrypt.setUseEngineSocket(factory, true);
+        }
+
         SSLServerSocket socket = (SSLServerSocket) factory.createServerSocket(port);
         socket.setReuseAddress(true);
         socket.setWantClientAuth(false);
@@ -179,7 +184,7 @@ public final class TlsIdentity {
         return result.toString();
     }
 
-    private static void enableModernTls(SSLServerSocket socket) {
+    private static void enableModernTls(SSLSocket socket) {
         List<String> supported = Arrays.asList(socket.getSupportedProtocols());
         List<String> enabled = new ArrayList<String>();
         for (String candidate : new String[] { "TLSv1.3", "TLSv1.2" }) {
@@ -269,10 +274,15 @@ public final class TlsIdentity {
     }
 
     public static final class ModernTlsSocketFactory extends SSLSocketFactory {
-        private final SSLSocketFactory delegate;
+    private final SSLSocketFactory delegate;
 
-        public ModernTlsSocketFactory(SSLSocketFactory delegate) { this.delegate = delegate; }
-
+        public ModernTlsSocketFactory(SSLSocketFactory delegate) { 
+            this.delegate = delegate; 
+            if (Conscrypt.isConscrypt(delegate)) {
+                Conscrypt.setUseEngineSocket(delegate, true);
+            }
+        }
+        
         private Socket configure(Socket socket) {
             if (socket instanceof SSLSocket) {
                 enableModernTls((SSLSocket) socket);
