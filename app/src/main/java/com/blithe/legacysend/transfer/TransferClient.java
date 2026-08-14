@@ -179,10 +179,14 @@ public final class TransferClient {
         Socket socket;
 
         if (isHttps) {
+            Socket underlyingSocket = new Socket();
+            underlyingSocket.connect(new InetSocketAddress(remote.getAddress(), remote.getPort()), 10000);
+            underlyingSocket.setSoTimeout(timeout);
+
             SSLSocketFactory factory = identity.createPinnedClientFactory(context, remote.getFingerprint());
-            SSLSocket sslSocket = (SSLSocket) factory.createSocket();
-            sslSocket.connect(new InetSocketAddress(remote.getAddress(), remote.getPort()), 10000);
-            sslSocket.setSoTimeout(timeout);
+            String host = remote.getAddress().getHostAddress();
+            SSLSocket sslSocket = (SSLSocket) factory.createSocket(underlyingSocket, host, remote.getPort(), true);
+            
             sslSocket.startHandshake();
             socket = sslSocket;
         } else {
@@ -196,7 +200,6 @@ public final class TransferClient {
         BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream(), 16 * 1024);
         BufferedInputStream in = new BufferedInputStream(socket.getInputStream(), 16 * 1024);
 
-        // Escribir Headers HTTP manuales
         String headers = method + " " + path + " HTTP/1.1\r\n"
                 + "Host: " + remote.getAddress().getHostAddress() + ":" + remote.getPort() + "\r\n"
                 + "User-Agent: LegacySend\r\n"
@@ -213,7 +216,6 @@ public final class TransferClient {
             out.flush();
         }
 
-        // Leer Respuesta HTTP
         HttpResponse response = parseResponse(in);
         socket.close();
         return response;
@@ -249,14 +251,13 @@ public final class TransferClient {
 
         ByteArrayOutputStream bodyStream = new ByteArrayOutputStream();
         if (chunked) {
-            // Lectura básica para respuestas chunked pequeñas
             while (true) {
                 String chunkSizeHex = readLine(in);
                 int semicolon = chunkSizeHex.indexOf(';');
                 if (semicolon >= 0) chunkSizeHex = chunkSizeHex.substring(0, semicolon);
                 int size = Integer.parseInt(chunkSizeHex.trim(), 16);
                 if (size == 0) {
-                    readLine(in); // consumir CRLF final
+                    readLine(in);
                     break;
                 }
                 byte[] chunk = new byte[size];
@@ -267,7 +268,7 @@ public final class TransferClient {
                     readTotal += r;
                 }
                 bodyStream.write(chunk, 0, readTotal);
-                readLine(in); // consumir CRLF del chunk
+                readLine(in);
             }
         } else if (contentLength >= 0) {
             IoUtils.copy(in, bodyStream, contentLength, null);
