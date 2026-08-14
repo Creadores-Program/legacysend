@@ -121,7 +121,7 @@ public final class TransferClient {
                 HttpResponse uploadResponse;
                 try {
                     uploadResponse = executeStreamRequest(remote, path, "POST", input, file.getSize(), 
-                            "application/octet-stream", 300000, new IoUtils.ProgressListener() {
+                            "application/octet-stream", 300000, isVersionGreaterOrEqual(remote.getVersion(), "2.2"), new IoUtils.ProgressListener() {
                                 @Override public void onBytes(long copied) throws IOException {
                                     checkCancelled();
                                     listener.onProgress(file.getFileName(), fileNumber, files.size(),
@@ -171,11 +171,11 @@ public final class TransferClient {
     private HttpResponse executeRequest(DeviceInfo remote, String path, String method, byte[] body,
                                        String contentType, int timeout, IoUtils.ProgressListener listener) throws Exception {
         return executeStreamRequest(remote, path, method, body != null ? new java.io.ByteArrayInputStream(body) : null,
-                body != null ? body.length : 0, contentType, timeout, listener);
+                body != null ? body.length : 0, contentType, timeout, false, listener);
     }
 
     private HttpResponse executeStreamRequest(DeviceInfo remote, String path, String method, InputStream bodyInput,
-                                              long bodyLength, String contentType, int timeout,
+                                              long bodyLength, String contentType, int timeout, boolean useChunked,
                                               IoUtils.ProgressListener listener) throws Exception {
         boolean isHttps = !"http".equalsIgnoreCase(remote.getProtocol());
         Socket socket;
@@ -196,8 +196,6 @@ public final class TransferClient {
 
         BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream(), 16 * 1024);
         BufferedInputStream in = new BufferedInputStream(socket.getInputStream(), 16 * 1024);
-
-        boolean useChunked = isVersionGreaterOrEqual(remote.getVersion(), "2.2");
 
         StringBuilder headersBuilder = new StringBuilder();
         headersBuilder.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
