@@ -11,7 +11,6 @@ import org.conscrypt.Conscrypt;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -33,6 +32,7 @@ import java.util.Date;
 import java.util.List;
 
 import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
@@ -125,7 +125,7 @@ public final class TlsIdentity {
     public SSLServerSocket createServerSocket(int port) throws Exception {
         SSLContext context = createContext(new AcceptAllTrustManager());
         SSLServerSocketFactory factory = context.getServerSocketFactory();
-
+        
         if (Conscrypt.isConscrypt(factory)) {
             Conscrypt.setUseEngineSocket(factory, true);
         }
@@ -151,12 +151,13 @@ public final class TlsIdentity {
     }
 
     private SSLContext createContext(X509TrustManager trustManager) throws Exception {
-        KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(
                 KeyManagerFactory.getDefaultAlgorithm());
         
         char[] pass = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) ? null : LOCAL_STORE_PASS;
-        keyManagers.init(keyStore, pass);
-        
+        keyManagerFactory.init(keyStore, pass);
+        KeyManager[] keyManagers = keyManagerFactory.getKeyManagers();
+
         SSLContext context;
         Provider conscryptProvider = Security.getProvider("Conscrypt");
         if (conscryptProvider != null) {
@@ -165,7 +166,7 @@ public final class TlsIdentity {
             context = SSLContext.getInstance("TLS");
         }
         
-        context.init(keyManagers.getKeyManagers(), new TrustManager[] { trustManager }, new SecureRandom());
+        context.init(keyManagers, new TrustManager[] { trustManager }, new SecureRandom());
         return context;
     }
 
