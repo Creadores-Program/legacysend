@@ -180,7 +180,6 @@ public final class TransferClient {
 
         if (isHttps) {
             SSLSocketFactory factory = identity.createPinnedClientFactory(context, remote.getFingerprint());
-            String host = remote.getAddress().getHostAddress();
             
             SSLSocket sslSocket = (SSLSocket) factory.createSocket(remote.getAddress(), remote.getPort());
             sslSocket.setSoTimeout(timeout);
@@ -197,25 +196,83 @@ public final class TransferClient {
         BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream(), 16 * 1024);
         BufferedInputStream in = new BufferedInputStream(socket.getInputStream(), 16 * 1024);
 
-        String headers = method + " " + path + " HTTP/1.1\r\n"
-                + "Host: " + remote.getAddress().getHostAddress() + ":" + remote.getPort() + "\r\n"
-                + "User-Agent: LegacySend\r\n"
-                + "Accept: application/json\r\n"
-                + "Content-Type: " + contentType + "\r\n"
-                + "Content-Length: " + bodyLength + "\r\n"
-                + "Connection: close\r\n\r\n";
+        boolean useChunked = isVersionGreaterOrEqual(remote.getVersion(), "2.2");
 
-        out.write(headers.getBytes(UTF8));
+        StringBuilder headersBuilder = new StringBuilder();
+        headersBuilder.append(method).append(" ").append(path).append(" HTTP/1.1\r\n");
+        headersBuilder.append("Host: ").append(remote.getAddress().getHostAddress()).append(":").append(remote.getPort()).append("\r\n");
+        headersBuilder.append("User-Agent: LegacySend\r\n");
+        headersBuilder.append("Accept: application/json\r\n");
+        headersBuilder.append("Content-Type: ").append(contentType).append("\r\n");
+
+        if (useChunked) {
+            headersBuilder.append("Transfer-Encoding: chunked\r\n");
+        } else {
+            headersBuilder.append("Content-Length: ").append(bodyLength).append("\r\n");
+        }
+        
+        headersBuilder.append("Connection: close\r\n\r\n");
+
+        out.write(headersBuilder.toString().getBytes(UTF8));
 
         if (bodyInput != null && bodyLength > 0) {
-            IoUtils.copy(bodyInput, out, bodyLength, listener);
+            if (useChunked) {
+                writeChunkedBody(bodyInput, out, listener);
+            } else {
+                IoUtils.copy(bodyInput, out, bodyLength, listener);
+            }
         } else {
+            if (useChunked) {
+                out.write("0\r\n\r\n".getBytes(UTF8));
+            }
             out.flush();
         }
 
         HttpResponse response = parseResponse(in);
         socket.close();
         return response;
+    }
+
+    private void writeChunkedBody(InputStream input, OutputStream output, IoUtils.ProgressListener listener) throws IOException {
+        byte[] buffer = new byte[8192];
+        long totalCopied = 0;
+        int read;
+        while ((read = input.read(buffer)) != -1) {
+            if (read > 0) {
+                String chunkHeader = Integer.toHexString(read) + "\r\n";
+                output.write(chunkHeader.getBytes(UTF8));
+                output.write(buffer, 0, read);
+                output.write("\r\n".getBytes(UTF8));
+                
+                totalCopied += read;
+                if (listener != null) {
+                    listener.onBytes(totalCopied);
+                }
+            }
+        }
+        output.write("0\r\n\r\n".getBytes(UTF8));
+        output.flush();
+    }
+
+    private boolean isVersionGreaterOrEqual(String remoteVersion, String targetVersion) {
+        if (remoteVersion == null || remoteVersion.isEmpty()) {
+            return false;
+        }
+        try {
+            String[] remoteParts = remoteVersion.split("\\.");
+            String[] targetParts = targetVersion.split("\\.");
+            
+            int length = Math.max(remoteParts.length, targetParts.length);
+            for (int i = 0; i < length; i++) {
+                int rVal = i < remoteParts.length ? Integer.parseInt(remoteParts[i].replaceAll("[^0-9]", "")) : 0;
+                int tVal = i < targetParts.length ? Integer.parseInt(targetParts[i].replaceAll("[^0-9]", "")) : 0;
+                if (rVal > tVal) return true;
+                if (rVal < tVal) return false;
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private HttpResponse parseResponse(InputStream in) throws IOException {
