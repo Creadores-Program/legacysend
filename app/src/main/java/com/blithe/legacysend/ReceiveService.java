@@ -16,7 +16,11 @@ public final class ReceiveService extends Service {
         super.onCreate();
         
         Intent open = new Intent(this, MainActivity.class);
-        PendingIntent pending = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23){
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        PendingIntent pending = PendingIntent.getActivity(this, 0, open, flags);
         
         String title = getString(R.string.notif_receive_title);
         String text = getString(R.string.notif_receive_text);
