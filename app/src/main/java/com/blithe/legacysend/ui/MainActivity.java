@@ -1,9 +1,11 @@
 package com.blithe.legacysend.ui;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ClipData;
+import android.content.pm.PackageManager;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
@@ -37,6 +39,9 @@ import java.util.Locale;
 
 public final class MainActivity extends Activity implements LegacySendApp.UiListener {
 
+    private static final int PICK_FILES = 1001;
+    private static final int STORAGE_PERMISSION = 1002;
+
     private LegacySendApp app;
     private TextView deviceName;
     private TextView serviceStatus;
@@ -56,6 +61,7 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         super.onCreate(state);
         app = (LegacySendApp) getApplication();
         buildUi();
+        ensureStoragePermission();
         app.setUiListener(this);
         app.startReceiving();
         importSharedFiles(getIntent());
@@ -146,7 +152,15 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
     }
 
     private void openFilePicker() {
-        openLegacyDirectory(legacyStorageRoot());
+        if (Build.VERSION.SDK_INT <= 20) {
+            openLegacyDirectory(legacyStorageRoot());
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        startActivityForResult(intent, PICK_FILES);
     }
 
     private void openLegacyDirectory(final File directory) {
@@ -210,6 +224,21 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
             return parent;
         }
         return root;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_FILES || resultCode != RESULT_OK || data == null) return;
+        int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        ClipData clip = data.getClipData();
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) addSelectedUri(clip.getItemAt(i).getUri(), flags);
+        } else if (data.getData() != null) {
+            addSelectedUri(data.getData(), flags);
+        }
+        renderSelectedFiles();
     }
 
     private void addSelectedUri(Uri uri) {
@@ -392,6 +421,14 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         progressFile.setText(file.length() == 0 ? getString(R.string.status_preparing) : getString(R.string.label_current_file, file));
         progressPath.setText(path.length() == 0 ? "" : getString(R.string.label_save_location, path));
         progressBar.setProgress(percent);
+    }
+
+    private void ensureStoragePermission() {
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED){
+            requestPermissions(new String[] { Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE }, STORAGE_PERMISSION);
+        }
     }
 
     private TextView section(String value) {
