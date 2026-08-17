@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Environment;
 import android.view.Gravity;
 import android.view.View;
@@ -241,8 +242,13 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         renderSelectedFiles();
     }
 
-    private void addSelectedUri(Uri uri) {
+    private void addSelectedUri(Uri uri, int flags) {
         if (uri == null) return;
+        if(Build.VERSION.SDK_INT >= 19){
+            try {
+                getContentResolver().takePersistableUriPermission(uri, flags & Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (Exception ignored) {}
+        }
         for (TransferFile file : selectedFiles) if (uri.equals(file.getUri())) return;
         selectedFiles.add(StorageUtils.describe(this, getContentResolver(), uri));
     }
@@ -253,19 +259,24 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         if (!Intent.ACTION_SEND.equals(action) && !Intent.ACTION_SEND_MULTIPLE.equals(action)) return;
 
         int previousCount = selectedFiles.size();
+        int flags = -1;
+        if(Build.VERSION.SDK_INT >= 19){
+            flags = intent.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        }
         if (Intent.ACTION_SEND_MULTIPLE.equals(action)) {
             ArrayList<Uri> streams = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
             if (streams != null) {
-                for (Uri uri : streams) addSelectedUri(uri);
+                for (Uri uri : streams) addSelectedUri(uri, flags);
             }
         } else {
-            addSelectedUri((Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM));
+            addSelectedUri(((Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM)), flags);
         }
 
         ClipData clip = intent.getClipData();
         if (clip != null) {
             for (int index = 0; index < clip.getItemCount(); index++) {
-                addSelectedUri(clip.getItemAt(index).getUri());
+                addSelectedUri(clip.getItemAt(index).getUri(), flags);
             }
         }
         renderSelectedFiles();
