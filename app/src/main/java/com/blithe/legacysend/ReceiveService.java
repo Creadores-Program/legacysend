@@ -50,7 +50,18 @@ public final class ReceiveService extends Service {
                     System.currentTimeMillis()
             );
             notification.flags |= Notification.FLAG_ONGOING_EVENT;
-            notification.setLatestEventInfo(this, title, text, pending);
+            try {
+                Method setLatestEventInfo = notification.getClass().getMethod(
+                    "setLatestEventInfo", 
+                    Context.class, 
+                    CharSequence.class, 
+                    CharSequence.class, 
+                    PendingIntent.class
+                );
+                setLatestEventInfo.invoke(notification, this, title, text, pending);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         
         startForeground(53317, notification);
