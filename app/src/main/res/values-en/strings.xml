@@ -1,4 +1,4 @@
-<resource>
+<resources>
     <string name="app_name">LegacySend</string>
     <string name="default_device_alias">Android Device</string>
     <string name="error_init_cert">Failed to initialize security certificate: </string>
@@ -84,4 +84,4 @@
     <string name="dialog_title_receiving_status">Receiving Status</string>
     <string name="status_preparing">Preparing…</string>
     <string name="label_current_file">Current file: %1$s</string>
-</resource>
+</resources>
