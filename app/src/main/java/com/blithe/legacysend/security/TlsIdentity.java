@@ -88,7 +88,7 @@ public final class TlsIdentity {
             store = KeyStore.getInstance(STORE_ANDROID);
             store.load(null);
             if (!store.containsAlias(ALIAS)) {
-                KeyPairGeneratorKeyPairGenerator generator = null;
+                KeyPairGenerator generator = null;
                 if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
                     generator = getKeyGeneratorM();
                     loadOrCreatePartM(generator);
