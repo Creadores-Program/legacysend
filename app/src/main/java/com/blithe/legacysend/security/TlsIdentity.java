@@ -80,7 +80,7 @@ public final class TlsIdentity {
         return KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, STORE_ANDROID);
     }
 
-    private static X509Certificate loadOrCreatePartJMr2(KeyStore store) throws Exception {
+    private static X509Certificate loadOrCreatePartJMr2(KeyStore store, Context context) throws Exception {
         if (!store.containsAlias(ALIAS)) {
             KeyPairGenerator generator = null;
             if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
@@ -113,7 +113,7 @@ public final class TlsIdentity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             store = KeyStore.getInstance(STORE_ANDROID);
             store.load(null);
-            certificate = loadOrCreatePartJMr2(store);
+            certificate = loadOrCreatePartJMr2(store, context);
         } else {
             File storeFile = new File(context.getFilesDir(), LOCAL_STORE_FILE);
             store = KeyStore.getInstance("PKCS12");
