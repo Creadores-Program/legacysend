@@ -68,7 +68,7 @@ public final class TlsIdentity {
         this.fingerprint = fingerprint;
     }
 
-    private void loadOrCreatePartM(KeyPairGenerator generator){
+    private static void loadOrCreatePartM(KeyPairGenerator generator){
         KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_DECRYPT | KeyProperties.PURPOSE_ENCRYPT)
             .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
@@ -76,7 +76,7 @@ public final class TlsIdentity {
         generator.initialize(spec);
     }
 
-    private KeyPairGenerator getKeyGeneratorM(){
+    private static KeyPairGenerator getKeyGeneratorM(){
         return KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, STORE_ANDROID);
     }
 
