@@ -3,6 +3,8 @@ package com.blithe.legacysend.security;
 import android.content.Context;
 import android.os.Build;
 import android.security.KeyPairGeneratorSpec;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
 
 import com.blithe.legacysend.R;
 
@@ -66,6 +68,18 @@ public final class TlsIdentity {
         this.fingerprint = fingerprint;
     }
 
+    private void loadOrCreatePartM(KeyPairGenerator generator){
+        KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_DECRYPT | KeyProperties.PURPOSE_ENCRYPT)
+            .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
+            .build();
+        generator.initialize(spec);
+    }
+
+    private KeyPairGenerator getKeyGeneratorM(){
+        return KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, STORE_ANDROID);
+    }
+
     public static TlsIdentity loadOrCreate(Context context) throws Exception {
         KeyStore store;
         X509Certificate certificate;
@@ -74,18 +88,24 @@ public final class TlsIdentity {
             store = KeyStore.getInstance(STORE_ANDROID);
             store.load(null);
             if (!store.containsAlias(ALIAS)) {
-                Calendar start = Calendar.getInstance();
-                Calendar end = Calendar.getInstance();
-                end.add(Calendar.YEAR, 20);
-                KeyPairGeneratorSpec spec = new KeyPairGeneratorSpec.Builder(context)
+                KeyPairGeneratorKeyPairGenerator generator = null;
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+                    generator = getKeyGeneratorM();
+                    loadOrCreatePartM(generator);
+                }else{
+                    Calendar start = Calendar.getInstance();
+                    Calendar end = Calendar.getInstance();
+                    end.add(Calendar.YEAR, 20);
+                    KeyPairGeneratorSpec spec = new KeyPairGeneratorSpec.Builder(context)
                         .setAlias(ALIAS)
                         .setSubject(new X500Principal("CN=LegacySend"))
                         .setSerialNumber(new BigInteger(128, new SecureRandom()).abs().add(BigInteger.ONE))
                         .setStartDate(start.getTime())
                         .setEndDate(end.getTime())
                         .build();
-                KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA", STORE_ANDROID);
-                generator.initialize(spec);
+                    generator = KeyPairGenerator.getInstance("RSA", STORE_ANDROID);
+                    generator.initialize(spec);
+                }
                 generator.generateKeyPair();
                 store.load(null);
             }
