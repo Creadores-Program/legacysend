@@ -80,6 +80,32 @@ public final class TlsIdentity {
         return KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, STORE_ANDROID);
     }
 
+    private static X509Certificate loadOrCreatePartJMr2(KeyStore store) throws Exception {
+        if (!store.containsAlias(ALIAS)) {
+            KeyPairGenerator generator = null;
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+                generator = getKeyGeneratorM();
+                loadOrCreatePartM(generator);
+            }else{
+                Calendar start = Calendar.getInstance();
+                Calendar end = Calendar.getInstance();
+                end.add(Calendar.YEAR, 20);
+                KeyPairGeneratorSpec spec = new KeyPairGeneratorSpec.Builder(context)
+                    .setAlias(ALIAS)
+                    .setSubject(new X500Principal("CN=LegacySend"))
+                    .setSerialNumber(new BigInteger(128, new SecureRandom()).abs().add(BigInteger.ONE))
+                    .setStartDate(start.getTime())
+                    .setEndDate(end.getTime())
+                    .build();
+                generator = KeyPairGenerator.getInstance("RSA", STORE_ANDROID);
+                generator.initialize(spec);
+            }
+            generator.generateKeyPair();
+            store.load(null);
+        }
+        return (X509Certificate) store.getCertificate(ALIAS);
+    }
+
     public static TlsIdentity loadOrCreate(Context context) throws Exception {
         KeyStore store;
         X509Certificate certificate;
@@ -87,29 +113,7 @@ public final class TlsIdentity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             store = KeyStore.getInstance(STORE_ANDROID);
             store.load(null);
-            if (!store.containsAlias(ALIAS)) {
-                KeyPairGenerator generator = null;
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
-                    generator = getKeyGeneratorM();
-                    loadOrCreatePartM(generator);
-                }else{
-                    Calendar start = Calendar.getInstance();
-                    Calendar end = Calendar.getInstance();
-                    end.add(Calendar.YEAR, 20);
-                    KeyPairGeneratorSpec spec = new KeyPairGeneratorSpec.Builder(context)
-                        .setAlias(ALIAS)
-                        .setSubject(new X500Principal("CN=LegacySend"))
-                        .setSerialNumber(new BigInteger(128, new SecureRandom()).abs().add(BigInteger.ONE))
-                        .setStartDate(start.getTime())
-                        .setEndDate(end.getTime())
-                        .build();
-                    generator = KeyPairGenerator.getInstance("RSA", STORE_ANDROID);
-                    generator.initialize(spec);
-                }
-                generator.generateKeyPair();
-                store.load(null);
-            }
-            certificate = (X509Certificate) store.getCertificate(ALIAS);
+            certificate = loadOrCreatePartJMr2(store);
         } else {
             File storeFile = new File(context.getFilesDir(), LOCAL_STORE_FILE);
             store = KeyStore.getInstance("PKCS12");
@@ -121,14 +125,14 @@ public final class TlsIdentity {
                     store.load(fis, LOCAL_STORE_PASS);
                 } catch (Exception e) {
                     storeFile.delete();
-                    store.load(null, null);
+                    store.load(null, LOCAL_STORE_PASS);
                 } finally {
                     if (fis != null) try { fis.close(); } catch (IOException ignored) {}
                 }
             }
             
             if (!store.containsAlias(ALIAS)) {
-                store.load(null, null);
+                store.load(null, LOCAL_STORE_PASS);
                 KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
                 kpg.initialize(2048, new SecureRandom());
                 KeyPair keyPair = kpg.generateKeyPair();
