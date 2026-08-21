@@ -237,6 +237,7 @@ public final class TransferClient {
         long totalCopied = 0;
         int read;
         while ((read = input.read(buffer)) != -1) {
+            checkCancelled();
             if (read > 0) {
                 String chunkHeader = Integer.toHexString(read) + "\r\n";
                 output.write(chunkHeader.getBytes(UTF8));
@@ -318,10 +319,17 @@ public final class TransferClient {
         ByteArrayOutputStream bodyStream = new ByteArrayOutputStream();
         if (chunked) {
             while (true) {
+                checkCancelled();
                 String chunkSizeHex = readLine(in);
                 int semicolon = chunkSizeHex.indexOf(';');
                 if (semicolon >= 0) chunkSizeHex = chunkSizeHex.substring(0, semicolon);
-                int size = Integer.parseInt(chunkSizeHex.trim(), 16);
+                int size = -1;
+                try{
+                   size = Integer.parseInt(chunkSizeHex.trim(), 16);
+                }catch(NumberFormatException e){
+                    checkCancelled();
+                    throw new IOException("Error in chunk!");
+                }
                 if (size == 0) {
                     readLine(in);
                     break;
@@ -345,10 +353,11 @@ public final class TransferClient {
         return new HttpResponse(statusCode, bodyStream.toByteArray());
     }
 
-    private static String readLine(InputStream input) throws IOException {
+    private String readLine(InputStream input) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         int previous = -1;
         while (output.size() <= 8192) {
+            checkCancelled();
             int current = input.read();
             if (current < 0) throw new IOException("HTTP response ended prematurely");
             if (previous == '\r' && current == '\n') {
@@ -363,9 +372,14 @@ public final class TransferClient {
 
     private void closeActiveSocket() {
         Socket socket = activeSocket;
+        activeSocket = null;
         if (socket != null) {
+            try {
+                if (!socket.isInputShutdown()) {
+                    socket.shutdownInput();
+                }
+            }catch(Exception ignored){}
             try { socket.close(); } catch (IOException ignored) {}
-            activeSocket = null;
         }
     }
 
