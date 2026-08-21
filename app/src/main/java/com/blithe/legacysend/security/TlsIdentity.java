@@ -116,7 +116,7 @@ public final class TlsIdentity {
             certificate = loadOrCreatePartJMr2(store, context);
         } else {
             File storeFile = new File(context.getFilesDir(), LOCAL_STORE_FILE);
-            store = KeyStore.getInstance("PKCS12");
+            store = KeyStore.getInstance("BKS");
 
             if (storeFile.exists()) {
                 FileInputStream fis = null;
@@ -129,6 +129,8 @@ public final class TlsIdentity {
                 } finally {
                     if (fis != null) try { fis.close(); } catch (IOException ignored) {}
                 }
+            }else{
+                store.load(null, LOCAL_STORE_PASS);
             }
             
             if (!store.containsAlias(ALIAS)) {
