@@ -134,7 +134,6 @@ public final class TlsIdentity {
             }
             
             if (!store.containsAlias(ALIAS)) {
-                store.load(null, LOCAL_STORE_PASS);
                 KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
                 kpg.initialize(2048, new SecureRandom());
                 KeyPair keyPair = kpg.generateKeyPair();
