@@ -309,7 +309,7 @@ public final class TlsIdentity {
     private static X509Certificate generateSelfSignedCert(KeyPair keyPair) throws Exception {
         long now = System.currentTimeMillis();
         Date startDate = new Date(now - 86400000L);
-        Date endDate = new Date(now + (20L * 365 * 24 * 60 * 60 * 1000));
+        Date endDate = new Date(now + (10L * 365 * 24 * 60 * 60 * 1000));
         BigInteger serialNumber = BigInteger.valueOf(now);
 
         byte[] certBytes = SimpleX509Generator.generate(
@@ -407,14 +407,14 @@ public final class TlsIdentity {
         public static byte[] generate(KeyPair keyPair, String dn, BigInteger serial, Date notBefore, Date notAfter) throws Exception {
             byte[] tbs = buildTBSCertificate(serial, dn, notBefore, notAfter, keyPair.getPublic());
             
-            Signature sig = Signature.getInstance("SHA256withRSA");
+            Signature sig = Signature.getInstance("SHA1withRSA");
             sig.initSign(keyPair.getPrivate());
             sig.update(tbs);
             byte[] signature = sig.sign();
 
             ByteArrayOutputStream cert = new ByteArrayOutputStream();
             cert.write(0x30);
-            byte[] body = cat(tbs, SHA256_WITH_RSA_ALG_ID, encodeBitString(signature));
+            byte[] body = cat(tbs, SHA1_WITH_RSA_ALG_ID, encodeBitString(signature));
             writeLength(cert, body.length);
             cert.write(body);
             return cert.toByteArray();
@@ -429,16 +429,16 @@ public final class TlsIdentity {
             byte[] validity = encodeValidity(notBefore, notAfter);
             byte[] pubKeyBytes = pubKey.getEncoded();
 
-            byte[] body = cat(version, serialBytes, SHA256_WITH_RSA_ALG_ID, dnBytes, validity, dnBytes, pubKeyBytes);
+            byte[] body = cat(version, serialBytes, SHA1_WITH_RSA_ALG_ID, dnBytes, validity, dnBytes, pubKeyBytes);
             
             tbs.write(0x30);
             writeLength(tbs, body.length);
             tbs.write(body);
             return tbs.toByteArray();
         }
-
-        private static final byte[] SHA256_WITH_RSA_ALG_ID = new byte[] {
-            0x30, 0x0D, 0x06, 0x09, 0x2A, (byte)0x86, 0x48, (byte)0x86, (byte)0xF7, 0x0D, 0x01, 0x01, 0x0B, 0x05, 0x00
+        
+        private static final byte[] SHA1_WITH_RSA_ALG_ID = new byte[] {
+            0x30, 0x0D, 0x06, 0x09, 0x2A, (byte)0x86, 0x48, (byte)0x86, (byte)0xF7, 0x0D, 0x01, 0x01, 0x05, 0x05, 0x00
         };
 
         private static byte[] encodeInteger(BigInteger val) throws IOException {
@@ -467,7 +467,7 @@ public final class TlsIdentity {
             attr.write(0x06); // OID 2.5.4.3 (commonName)
             attr.write(0x03);
             attr.write(new byte[]{0x55, 0x04, 0x03});
-            attr.write(0x0C); // UTF8String
+            attr.write(0x13); // 0x0C (UTF8) | 0x13 (PrintableString)
             writeLength(attr, nameBytes.length);
             attr.write(nameBytes);
 
