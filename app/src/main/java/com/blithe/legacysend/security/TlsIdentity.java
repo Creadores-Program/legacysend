@@ -80,6 +80,32 @@ public final class TlsIdentity {
         return KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, STORE_ANDROID);
     }
 
+    private static X509Certificate loadOrCreatePartJMr2(KeyStore store, Context context) throws Exception {
+        if (!store.containsAlias(ALIAS)) {
+            KeyPairGenerator generator = null;
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+                generator = getKeyGeneratorM();
+                loadOrCreatePartM(generator);
+            }else{
+                Calendar start = Calendar.getInstance();
+                Calendar end = Calendar.getInstance();
+                end.add(Calendar.YEAR, 20);
+                KeyPairGeneratorSpec spec = new KeyPairGeneratorSpec.Builder(context)
+                    .setAlias(ALIAS)
+                    .setSubject(new X500Principal("CN=LegacySend"))
+                    .setSerialNumber(new BigInteger(128, new SecureRandom()).abs().add(BigInteger.ONE))
+                    .setStartDate(start.getTime())
+                    .setEndDate(end.getTime())
+                    .build();
+                generator = KeyPairGenerator.getInstance("RSA", STORE_ANDROID);
+                generator.initialize(spec);
+            }
+            generator.generateKeyPair();
+            store.load(null);
+        }
+        return (X509Certificate) store.getCertificate(ALIAS);
+    }
+
     public static TlsIdentity loadOrCreate(Context context) throws Exception {
         KeyStore store;
         X509Certificate certificate;
@@ -87,32 +113,10 @@ public final class TlsIdentity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
             store = KeyStore.getInstance(STORE_ANDROID);
             store.load(null);
-            if (!store.containsAlias(ALIAS)) {
-                KeyPairGenerator generator = null;
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
-                    generator = getKeyGeneratorM();
-                    loadOrCreatePartM(generator);
-                }else{
-                    Calendar start = Calendar.getInstance();
-                    Calendar end = Calendar.getInstance();
-                    end.add(Calendar.YEAR, 20);
-                    KeyPairGeneratorSpec spec = new KeyPairGeneratorSpec.Builder(context)
-                        .setAlias(ALIAS)
-                        .setSubject(new X500Principal("CN=LegacySend"))
-                        .setSerialNumber(new BigInteger(128, new SecureRandom()).abs().add(BigInteger.ONE))
-                        .setStartDate(start.getTime())
-                        .setEndDate(end.getTime())
-                        .build();
-                    generator = KeyPairGenerator.getInstance("RSA", STORE_ANDROID);
-                    generator.initialize(spec);
-                }
-                generator.generateKeyPair();
-                store.load(null);
-            }
-            certificate = (X509Certificate) store.getCertificate(ALIAS);
+            certificate = loadOrCreatePartJMr2(store, context);
         } else {
             File storeFile = new File(context.getFilesDir(), LOCAL_STORE_FILE);
-            store = KeyStore.getInstance("PKCS12");
+            store = KeyStore.getInstance("BKS");
 
             if (storeFile.exists()) {
                 FileInputStream fis = null;
@@ -121,14 +125,15 @@ public final class TlsIdentity {
                     store.load(fis, LOCAL_STORE_PASS);
                 } catch (Exception e) {
                     storeFile.delete();
-                    store.load(null, null);
+                    store.load(null, LOCAL_STORE_PASS);
                 } finally {
                     if (fis != null) try { fis.close(); } catch (IOException ignored) {}
                 }
+            }else{
+                store.load(null, LOCAL_STORE_PASS);
             }
             
             if (!store.containsAlias(ALIAS)) {
-                store.load(null, null);
                 KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
                 kpg.initialize(2048, new SecureRandom());
                 KeyPair keyPair = kpg.generateKeyPair();
@@ -465,15 +470,21 @@ public final class TlsIdentity {
             attr.write(0x0C); // UTF8String
             writeLength(attr, nameBytes.length);
             attr.write(nameBytes);
+            byte[] innerBytes = attr.toByteArray();
+
+            ByteArrayOutputStream atvSeq = new ByteArrayOutputStream();
+            atvSeq.write(0x30); // SEQUENCE
+            writeLength(atvSeq, innerBytes.length);
+            atvSeq.write(innerBytes);
+            byte[] atvSeqBytes = atvSeq.toByteArray();
 
             ByteArrayOutputStream set = new ByteArrayOutputStream();
             set.write(0x31); // SET
-            byte[] attrBytes = attr.toByteArray();
-            writeLength(set, attrBytes.length);
-            set.write(attrBytes);
+            writeLength(set, atvSeqBytes.length);
+            set.write(atvSeqBytes);
 
             ByteArrayOutputStream seq = new ByteArrayOutputStream();
-            seq.write(0x30);
+            seq.write(0x30); // SEQUENCE
             byte[] setBytes = set.toByteArray();
             writeLength(seq, setBytes.length);
             seq.write(setBytes);
