@@ -246,7 +246,7 @@ public final class TransferServer {
         }
 
         final File temporary = new File(directory, "." + target.getName() + "." + sessionId + ".part");
-        InputStream payloadInput = request.isChunked ? new ChunkedInputStream(input) : input;
+        InputStream payloadInput = request.isChunked ? new ChunkedInputStream(input, session) : input;
 
         try {
             FileOutputStream fileOutput = new FileOutputStream(temporary);
@@ -352,9 +352,11 @@ public final class TransferServer {
     private static final class ChunkedInputStream extends FilterInputStream {
         private long chunkSize = 0;
         private boolean closed = false;
+        private final IncomingSession session;
 
-        protected ChunkedInputStream(InputStream in) {
+        protected ChunkedInputStream(InputStream in, IncomingSession session) {
             super(in);
+            this.session = session;
         }
 
         @Override
@@ -366,6 +368,7 @@ public final class TransferServer {
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
+            checkCancelled();
             if (closed) return -1;
             if (chunkSize == 0) {
                 readChunkHeader();
@@ -391,6 +394,7 @@ public final class TransferServer {
         }
 
         private void readChunkHeader() throws IOException {
+            checkCancelled();
             String line = Request.readLine(in);
             int semicolon = line.indexOf(';');
             if (semicolon >= 0) {
@@ -399,7 +403,14 @@ public final class TransferServer {
             try {
                 chunkSize = Long.parseLong(line.trim(), 16);
             } catch (NumberFormatException e) {
+                checkCancelled();
                 throw new IOException("Invalid chunk header size: " + line);
+            }
+        }
+
+        private void checkCancelled() throws IOException {
+            if (session != null && session.getDecision() == IncomingSession.Decision.CANCELLED) {
+                throw new IOException("Transfer cancelled");
             }
         }
 

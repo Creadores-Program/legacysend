@@ -54,6 +54,7 @@ public final class LegacySendApp extends Application implements DiscoveryManager
     private volatile TransferClient transferClient;
     private volatile boolean starting;
     private volatile IncomingSession activeIncoming;
+    private volatile long lastProgressPostTime = 0L;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -199,7 +200,14 @@ public final class LegacySendApp extends Application implements DiscoveryManager
     }
 
     public void cancelSending() {
-        if (transferClient != null) transferClient.cancel();
+        background.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (transferClient != null){
+                    transferClient.cancel();
+                }
+            }
+        });
     }
 
     public void decideIncoming(IncomingSession session, boolean accept) {
@@ -209,12 +217,17 @@ public final class LegacySendApp extends Application implements DiscoveryManager
     }
 
     public void cancelIncoming() {
-        IncomingSession current = activeIncoming;
-        if (current != null) {
-            TransferServer currentServer = server;
-            if (currentServer != null) currentServer.cancel(current);
-            current.cancel();
-        }
+        background.execute(new Runnable() {
+            @Override
+            public void run() {
+                IncomingSession current = activeIncoming;
+                if (current != null) {
+                    TransferServer currentServer = server;
+                     if (currentServer != null) currentServer.cancel(current);
+                     current.cancel();
+                }
+            }
+        });
     }
 
     @Override public void onDevice(final DeviceInfo device, boolean announced) {
@@ -299,12 +312,16 @@ public final class LegacySendApp extends Application implements DiscoveryManager
 
     private void postProgress(final boolean sending, final String title, final String file,
                               final int percent, final String path) {
-        main.post(new Runnable() {
-            @Override public void run() {
-                UiListener listener = uiListener;
-                if (listener != null) listener.onTransferProgress(sending, title, file, percent, path);
-            }
-        });
+        long now = System.currentTimeMillis();
+        if (percent == 0 || percent == 100 || (now - lastProgressPostTime) > 100) {
+            lastProgressPostTime = now;
+            main.post(new Runnable() {
+                @Override public void run() {
+                    UiListener listener = uiListener;
+                    if (listener != null) listener.onTransferProgress(sending, title, file, percent, path);
+                }
+            });
+        }
     }
 
     private void postResult(final boolean sending, final boolean success, final String message) {
