@@ -363,9 +363,14 @@ public final class TransferClient {
 
     private void closeActiveSocket() {
         Socket socket = activeSocket;
+        activeSocket = null;
         if (socket != null) {
+            try {
+                if (!socket.isInputShutdown()) {
+                    socket.shutdownInput();
+                }
+            }catch(Exception ignored){}
             try { socket.close(); } catch (IOException ignored) {}
-            activeSocket = null;
         }
     }
 
