@@ -2,6 +2,7 @@ package com.blithe.legacysend.server;
 
 import android.content.Context;
 
+import com.blithe.legacysend.R;
 import com.blithe.legacysend.model.DeviceInfo;
 import com.blithe.legacysend.model.TransferFile;
 import com.blithe.legacysend.protocol.ProtocolJson;
@@ -16,6 +17,7 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -38,7 +40,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLSocket;
 
 public final class TransferServer {
@@ -109,12 +110,15 @@ public final class TransferServer {
         while (running.get()) {
             try {
                 final Socket socket = serverSocket.accept();
-                socket.setSoTimeout(300_000);
+                socket.setSoTimeout(300000);
                 workers.execute(new Runnable() {
                     @Override public void run() { handle(socket); }
                 });
             } catch (IOException error) {
-                if (running.get()) listener.onReceiveFailed(null, "接收服务异常：" + error.getMessage());
+                if (running.get()) {
+                    String msg = context.getString(R.string.error_server_accept_failed, readable(error));
+                    listener.onReceiveFailed(null, msg);
+                }
             }
         }
     }
@@ -145,7 +149,7 @@ public final class TransferServer {
         }
         if ("POST".equals(request.method) && "/api/localsend/v2/register".equals(path)) {
             JSONObject body = readJson(input, request.contentLength);
-            DeviceInfo remote = DeviceInfo.fromJson(body, socket.getInetAddress());
+            DeviceInfo remote = DeviceInfo.fromJson(context, body, socket.getInetAddress());
             if (!certificateMatches(socket, remote)) {
                 respond(output, 403, "text/plain", new byte[0]);
                 return;
@@ -168,7 +172,7 @@ public final class TransferServer {
             respond(output, 200, "text/plain", new byte[0]);
             return;
         }
-        respond(output, 404, "text/plain; charset=utf-8", "接口不存在".getBytes(UTF8));
+        respond(output, 404, "text/plain; charset=utf-8", context.getString(R.string.error_endpoint_not_found).getBytes(UTF8));
     }
 
     private void prepareUpload(Socket socket, BufferedInputStream input, OutputStream output, Request request)
@@ -180,7 +184,7 @@ public final class TransferServer {
             }
         }
         JSONObject body = readJson(input, request.contentLength);
-        DeviceInfo sender = DeviceInfo.fromJson(body.getJSONObject("info"), socket.getInetAddress());
+        DeviceInfo sender = DeviceInfo.fromJson(context, body.getJSONObject("info"), socket.getInetAddress());
         if (!certificateMatches(socket, sender)) {
             respond(output, 403, "text/plain", new byte[0]);
             return;
@@ -210,38 +214,52 @@ public final class TransferServer {
         String fileId = request.query.get("fileId");
         String token = request.query.get("token");
         IncomingSession session = sessions.get(sessionId);
-        TransferFile metadata = session == null ? null : session.findFile(fileId);
+        final TransferFile metadata = session == null ? null : session.findFile(fileId);
+
         if (session == null || metadata == null || token == null || !token.equals(session.getToken(fileId))
                 || !sameAddress(session.getSenderAddress(), socket.getInetAddress())) {
             respond(output, 403, "text/plain", new byte[0]);
             return;
         }
+
         if (session.getDecision() == IncomingSession.Decision.CANCELLED) {
             respond(output, 409, "text/plain", new byte[0]);
             return;
         }
-        if (request.contentLength < 0 || request.contentLength != metadata.getSize()) {
-            respond(output, 400, "text/plain; charset=utf-8", "文件大小不匹配".getBytes(UTF8));
+
+        if (!request.isChunked && request.contentLength >= 0 && request.contentLength != metadata.getSize()) {
+            respond(output, 400, "text/plain; charset=utf-8", context.getString(R.string.error_file_size_mismatch).getBytes(UTF8));
             return;
         }
+
         File directory = StorageUtils.receiveDirectory(context);
-        if (!directory.exists() && !directory.mkdirs()) throw new IOException("无法创建保存目录");
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException(context.getString(R.string.error_create_directory_failed));
+        }
+
         final File target;
         synchronized (StorageUtils.class) {
-            target = StorageUtils.uniqueFile(directory, metadata.getFileName());
-            if (!target.createNewFile()) throw new IOException("无法预留目标文件名");
+            target = StorageUtils.uniqueFile(context, directory, metadata.getFileName());
+            if (!target.createNewFile()) {
+                throw new IOException(context.getString(R.string.error_reserve_file_failed));
+            }
         }
+
         final File temporary = new File(directory, "." + target.getName() + "." + sessionId + ".part");
+        InputStream payloadInput = request.isChunked ? new ChunkedInputStream(input, session) : input;
+
         try {
             FileOutputStream fileOutput = new FileOutputStream(temporary);
+            long bytesToRead = metadata.getSize();
+
             try {
                 final IncomingSession currentSession = session;
-                IoUtils.copy(input, fileOutput, request.contentLength, new IoUtils.ProgressListener() {
+                IoUtils.copy(payloadInput, fileOutput, bytesToRead, new IoUtils.ProgressListener() {
                     @Override public void onBytes(long copied) throws IOException {
                         if (currentSession.getDecision() == IncomingSession.Decision.CANCELLED) {
-                            throw new IOException("接收已取消");
+                            throw new IOException(context.getString(R.string.error_reception_cancelled));
                         }
-                        long overall = currentSession.updateFileProgress(fileId, copied);
+                        long overall = currentSession.updateFileProgress(metadata.getId(), copied);
                         listener.onReceiveProgress(currentSession, metadata.getFileName(),
                                 IoUtils.percent(overall, currentSession.getTotalBytes()), target.getAbsolutePath());
                     }
@@ -249,13 +267,23 @@ public final class TransferServer {
             } finally {
                 fileOutput.close();
             }
-            synchronized (StorageUtils.class) {
-                if (!target.delete() || !temporary.renameTo(target)) throw new IOException("无法保存文件");
+
+            if (temporary.length() != metadata.getSize()) {
+                throw new IOException(context.getString(R.string.error_file_size_mismatch));
             }
+
+            synchronized (StorageUtils.class) {
+                if (!target.delete() || !temporary.renameTo(target)) {
+                    throw new IOException(context.getString(R.string.error_save_file_failed));
+                }
+            }
+
             session.getReceivedBytes().addAndGet(metadata.getSize());
             Set<String> done = completedFiles.get(sessionId);
             if (done != null) done.add(fileId);
+
             respond(output, 200, "text/plain", new byte[0]);
+
             if (done != null && done.size() == session.getFiles().size()) {
                 sessions.remove(sessionId);
                 completedFiles.remove(sessionId);
@@ -270,7 +298,6 @@ public final class TransferServer {
     }
 
     private static boolean certificateMatches(Socket socket, DeviceInfo device) {
-        // HTTP 模式没有 TLS 客户端证书；会话仍由来源 IP、sessionId 和随机 token 约束。
         if (!(socket instanceof SSLSocket)) return true;
         String peer = TlsIdentity.peerFingerprint(((SSLSocket) socket).getSession());
         return peer == null || peer.equalsIgnoreCase(device.getFingerprint().replace(":", ""));
@@ -283,8 +310,8 @@ public final class TransferServer {
     }
 
     private static JSONObject readJson(InputStream input, long length) throws Exception {
-        if (length < 0 || length > 2L * 1024L * 1024L) throw new IOException("JSON 请求大小无效");
-        ByteArrayOutputStream output = new ByteArrayOutputStream((int) length);
+        if (length < 0 || length > 2L * 1024L * 1024L) throw new IOException("Invalid JSON request size");
+        ByteArrayOutputStream output = new ByteArrayOutputStream((int) (length > 0 ? length : 1024));
         IoUtils.copy(input, output, length, null);
         return new JSONObject(new String(output.toByteArray(), UTF8));
     }
@@ -322,23 +349,99 @@ public final class TransferServer {
         return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
     }
 
+    private static final class ChunkedInputStream extends FilterInputStream {
+        private long chunkSize = 0;
+        private boolean closed = false;
+        private final IncomingSession session;
+
+        protected ChunkedInputStream(InputStream in, IncomingSession session) {
+            super(in);
+            this.session = session;
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] b = new byte[1];
+            int res = read(b, 0, 1);
+            return res == -1 ? -1 : (b[0] & 0xFF);
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            checkCancelled();
+            if (closed) return -1;
+            if (chunkSize == 0) {
+                readChunkHeader();
+                if (chunkSize == 0) {
+                    closed = true;
+                    readCRLF();
+                    return -1;
+                }
+            }
+
+            int bytesToRead = (int) Math.min(len, chunkSize);
+            int bytesRead = in.read(b, off, bytesToRead);
+            if (bytesRead == -1) {
+                throw new IOException("Premature EOF inside chunk body");
+            }
+
+            chunkSize -= bytesRead;
+            if (chunkSize == 0) {
+                readCRLF();
+            }
+
+            return bytesRead;
+        }
+
+        private void readChunkHeader() throws IOException {
+            checkCancelled();
+            String line = Request.readLine(in);
+            int semicolon = line.indexOf(';');
+            if (semicolon >= 0) {
+                line = line.substring(0, semicolon);
+            }
+            try {
+                chunkSize = Long.parseLong(line.trim(), 16);
+            } catch (NumberFormatException e) {
+                checkCancelled();
+                throw new IOException("Invalid chunk header size: " + line);
+            }
+        }
+
+        private void checkCancelled() throws IOException {
+            if (session != null && session.getDecision() == IncomingSession.Decision.CANCELLED) {
+                throw new IOException("Transfer cancelled");
+            }
+        }
+
+        private void readCRLF() throws IOException {
+            int cr = in.read();
+            int lf = in.read();
+            if (cr != '\r' || lf != '\n') {
+                throw new IOException("Corrupted chunked encoding (missing CRLF)");
+            }
+        }
+    }
+
     private static final class Request {
         final String method;
         final String path;
         final Map<String, String> query;
         final long contentLength;
+        final boolean isChunked;
 
-        Request(String method, String path, Map<String, String> query, long contentLength) {
+        Request(String method, String path, Map<String, String> query, long contentLength, boolean isChunked) {
             this.method = method;
             this.path = path;
             this.query = query;
             this.contentLength = contentLength;
+            this.isChunked = isChunked;
         }
 
         static Request read(InputStream input) throws Exception {
             String first = readLine(input);
             String[] parts = first.split(" ");
-            if (parts.length < 2) throw new IOException("HTTP 请求行无效");
+            if (parts.length < 2) throw new IOException("Invalid HTTP request line");
             Map<String, String> headers = new HashMap<String, String>();
             while (true) {
                 String line = readLine(input);
@@ -352,9 +455,11 @@ public final class TransferServer {
             String path = question < 0 ? rawTarget : rawTarget.substring(0, question);
             Map<String, String> query = question < 0 ? new HashMap<String, String>()
                     : parseQuery(rawTarget.substring(question + 1));
+            String transferEncoding = headers.get("transfer-encoding");
+            boolean isChunked = transferEncoding != null && transferEncoding.toLowerCase(Locale.US).contains("chunked");
             long length = headers.containsKey("content-length")
                     ? Long.parseLong(headers.get("content-length")) : -1L;
-            return new Request(parts[0], path, query, length);
+            return new Request(parts[0], path, query, length, isChunked);
         }
 
         private static Map<String, String> parseQuery(String value) throws Exception {
@@ -367,12 +472,12 @@ public final class TransferServer {
             return result;
         }
 
-        private static String readLine(InputStream input) throws IOException {
+        static String readLine(InputStream input) throws IOException {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             int previous = -1;
             while (output.size() <= 8192) {
                 int current = input.read();
-                if (current < 0) throw new IOException("HTTP 请求提前结束");
+                if (current < 0) throw new IOException("HTTP request ended prematurely");
                 if (previous == '\r' && current == '\n') {
                     byte[] bytes = output.toByteArray();
                     return new String(bytes, 0, Math.max(0, bytes.length - 1), UTF8);
@@ -380,7 +485,7 @@ public final class TransferServer {
                 output.write(current);
                 previous = current;
             }
-            throw new IOException("HTTP 请求头过长");
+            throw new IOException("HTTP header too long");
         }
     }
 }

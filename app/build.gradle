@@ -1,31 +1,41 @@
 plugins {
     id 'com.android.application'
 }
+dependencies {
+    implementation 'org.conscrypt:conscrypt-android:2.5.3'
+}
 
 android {
     namespace 'com.blithe.legacysend'
-    compileSdk 34
+    compileSdk 23
 
     defaultConfig {
         applicationId 'com.blithe.legacysend'
         minSdk 9
-        targetSdk 20
-        versionCode 4
-        versionName '1.2.2'
+        targetSdk 23
+        versionCode 5
+        versionName '1.3.0'
         testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+    }
+    signingConfigs {
+        debug {
+            storeFile file('LegacySend.keystore')
+            storePassword System.getenv("LEGACYSENDKEYCONTREAPP")
+            keyAlias "CreaSendLkey"
+            keyPassword System.getenv("LEGACYSENDKEYCONTREAPP")
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
 
     lint {
         abortOnError true
@@ -33,9 +43,4 @@ android {
         // 本项目不是 Play 商店应用；target 28 用于保留 API 19 到旧式外部存储的一致语义。
         disable 'ExpiredTargetSdkVersion'
     }
-}
-
-dependencies {
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.json:json:20240303'
 }
