@@ -1,9 +1,6 @@
 plugins {
     id 'com.android.application'
 }
-dependencies {
-    standardImplementation 'org.conscrypt:conscrypt-android:2.5.3'
-}
 
 android {
     namespace 'com.blithe.legacysend'
@@ -55,4 +52,8 @@ android {
         // 本项目不是 Play 商店应用；target 28 用于保留 API 19 到旧式外部存储的一致语义。
         disable 'ExpiredTargetSdkVersion'
     }
+}
+
+dependencies {
+    standardImplementation 'org.conscrypt:conscrypt-android:2.5.3'
 }
