@@ -218,9 +218,8 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
 
     private File legacyStorageRoot() {
         File root = Environment.getExternalStorageDirectory();
-        // Compatibilidad para firmwares antiguos donde se mapea el directorio raíz a Download
         File parent = root.getParentFile();
-        if (Environment.DIRECTORY_DOWNLOADS.equalsIgnoreCase(root.getName())
+        if (((Build.VERSION.SDK_INT >= 8) ? Environment.DIRECTORY_DOWNLOADS : "Download").equalsIgnoreCase(root.getName())
                 && parent != null && parent.canRead()) {
             return parent;
         }
