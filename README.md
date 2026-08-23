@@ -4,7 +4,7 @@ If you don't speak Chinese, please check our [GitHub Wiki](https://github.com/Cr
 
 一个独立实现的原生 Android Java 局域网文件传输应用，目标是兼容 LocalSend Protocol v2.2 的设备发现和 Upload API，专为旧版设备（Android 2.3 至 Android 6.0 / API 9 至 API 23）设计。项目不引用、导入或构建相邻的 LocalSend 源码目录。
 
-当前版本：`1.2`（versionCode 3）。
+当前版本：`1.3`（versionCode 5）。
 
 ## 下载与安装
 
