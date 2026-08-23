@@ -15,22 +15,16 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.MessageDigest;
-import java.security.PrivateKey;
-import java.security.Provider;
-import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.Security;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -50,6 +44,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.security.auth.x500.X500Principal;
 
+@SuppressWarnings({"deprecation", "all"})
 public final class TlsIdentity {
     private static final String STORE_ANDROID = "AndroidKeyStore";
     private static final String ALIAS = "legacysend-device-identity";
@@ -141,7 +136,7 @@ public final class TlsIdentity {
     public SSLServerSocket createServerSocket(int port) throws Exception {
         SSLContext context = createContext(new AcceptAllTrustManager());
         SSLServerSocketFactory factory = context.getServerSocketFactory();
-        
+
         SSLServerSocket socket = (SSLServerSocket) factory.createServerSocket(port);
         socket.setReuseAddress(true);
         socket.setWantClientAuth(false);
@@ -158,7 +153,6 @@ public final class TlsIdentity {
 
         javax.net.ssl.KeyManager[] customKeyManagers = new javax.net.ssl.KeyManager[] {
             new javax.net.ssl.X509KeyManager() {
-                @Override
                 public String chooseClientAlias(String[] keyType, java.security.Principal[] issuers, java.net.Socket socket) {
                     try {
                         java.util.Enumeration<String> aliases = keyStore.aliases();
@@ -171,27 +165,22 @@ public final class TlsIdentity {
                     return ALIAS;
                 }
 
-                @Override
                 public String chooseServerAlias(String keyType, java.security.Principal[] issuers, java.net.Socket socket) {
                     return defaultKm.chooseServerAlias(keyType, issuers, socket);
                 }
 
-                @Override
                 public java.security.cert.X509Certificate[] getCertificateChain(String alias) {
                     return defaultKm.getCertificateChain(alias);
                 }
 
-                @Override
                 public String[] getClientAliases(String keyType, java.security.Principal[] issuers) {
                     return defaultKm.getClientAliases(keyType, issuers);
                 }
 
-                @Override
                 public java.security.PrivateKey getPrivateKey(String alias) {
                     return defaultKm.getPrivateKey(alias);
                 }
 
-                @Override
                 public String[] getServerAliases(String keyType, java.security.Principal[] issuers) {
                     return defaultKm.getServerAliases(keyType, issuers);
                 }
@@ -208,7 +197,7 @@ public final class TlsIdentity {
 
     public static HostnameVerifier pinnedHostnameVerifier() {
         return new HostnameVerifier() {
-            @Override public boolean verify(String hostname, SSLSession session) {
+            public boolean verify(String hostname, SSLSession session) {
                 return true;
             }
         };
@@ -280,11 +269,11 @@ public final class TlsIdentity {
     }
 
     private static final class AcceptAllTrustManager implements X509TrustManager {
-        @Override public boolean checkClientTrusted(X509Certificate[] chain, String authType)
-                throws CertificateException { validateSelfSigned(chain); return true; }
-        @Override public boolean checkServerTrusted(X509Certificate[] chain, String authType)
-                throws CertificateException { validateSelfSigned(chain); return true; }
-        @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+        public void checkClientTrusted(X509Certificate[] chain, String authType)
+                throws CertificateException { validateSelfSigned(chain); }
+        public void checkServerTrusted(X509Certificate[] chain, String authType)
+                throws CertificateException { validateSelfSigned(chain); }
+        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
     }
 
     private static final class FingerprintTrustManager implements X509TrustManager {
@@ -296,10 +285,10 @@ public final class TlsIdentity {
             this.expected = normalize(expected);
         }
 
-        @Override public boolean checkClientTrusted(X509Certificate[] chain, String authType)
-                throws CertificateException { validateSelfSigned(chain); return true; }
+        public void checkClientTrusted(X509Certificate[] chain, String authType)
+                throws CertificateException { validateSelfSigned(chain); }
 
-        @Override public boolean checkServerTrusted(X509Certificate[] chain, String authType)
+        public void checkServerTrusted(X509Certificate[] chain, String authType)
                 throws CertificateException {
             if (chain == null || chain.length == 0) {
                 String msg = context != null ? context.getString(R.string.error_cert_missing) : "Peer provided no certificate";
@@ -317,10 +306,9 @@ public final class TlsIdentity {
                 String msg = context != null ? context.getString(R.string.error_cert_verify_failed) : "Failed to verify certificate fingerprint";
                 throw new CertificateException(msg, error);
             }
-            return true;
         }
 
-        @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+        public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
 
         private static String normalize(String value) {
             return value == null ? "" : value.replace(":", "").trim().toUpperCase(java.util.Locale.US);
@@ -332,7 +320,6 @@ public final class TlsIdentity {
 
         public ModernTlsSocketFactory(SSLSocketFactory delegate) { 
             this.delegate = delegate; 
-            // Sin invocaciones a Conscrypt.setUseEngineSocket
         }
 
         private Socket configure(Socket socket) {
@@ -342,21 +329,21 @@ public final class TlsIdentity {
             return socket;
         }
 
-        @Override public String[] getDefaultCipherSuites() { return delegate.getDefaultCipherSuites(); }
-        @Override public String[] getSupportedCipherSuites() { return delegate.getSupportedCipherSuites(); }
-        @Override public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+        public String[] getDefaultCipherSuites() { return delegate.getDefaultCipherSuites(); }
+        public String[] getSupportedCipherSuites() { return delegate.getSupportedCipherSuites(); }
+        public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
             return configure(delegate.createSocket(s, host, port, autoClose));
         }
-        @Override public Socket createSocket(String host, int port) throws IOException {
+        public Socket createSocket(String host, int port) throws IOException {
             return configure(delegate.createSocket(host, port));
         }
-        @Override public Socket createSocket(String host, int port, InetAddress local, int localPort) throws IOException {
+        public Socket createSocket(String host, int port, InetAddress local, int localPort) throws IOException {
             return configure(delegate.createSocket(host, port, local, localPort));
         }
-        @Override public Socket createSocket(InetAddress host, int port) throws IOException {
+        public Socket createSocket(InetAddress host, int port) throws IOException {
             return configure(delegate.createSocket(host, port));
         }
-        @Override public Socket createSocket(InetAddress address, int port, InetAddress local, int localPort)
+        public Socket createSocket(InetAddress address, int port, InetAddress local, int localPort)
                 throws IOException {
             return configure(delegate.createSocket(address, port, local, localPort));
         }
@@ -379,7 +366,7 @@ public final class TlsIdentity {
             return cert.toByteArray();
         }
 
-        private static byte[] buildTBSCertificate(BigInteger serial, String dn, Date notBefore, Date notAfter, PublicKey pubKey) throws Exception {
+        private static byte[] buildTBSCertificate(BigInteger serial, String dn, Date notBefore, Date notAfter, java.security.PublicKey pubKey) throws Exception {
             ByteArrayOutputStream tbs = new ByteArrayOutputStream();
             
             byte[] version = new byte[]{ (byte) 0xA0, 0x03, 0x02, 0x01, 0x02 };
