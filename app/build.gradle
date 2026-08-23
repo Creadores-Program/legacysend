@@ -2,7 +2,7 @@ plugins {
     id 'com.android.application'
 }
 dependencies {
-    implementation 'org.conscrypt:conscrypt-android:2.5.3'
+    standardImplementation 'org.conscrypt:conscrypt-android:2.5.3'
 }
 
 android {
@@ -11,11 +11,23 @@ android {
 
     defaultConfig {
         applicationId 'com.blithe.legacysend'
-        minSdk 9
         targetSdk 23
         versionCode 5
         versionName '1.3.0'
         testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+    }
+    flavorDimensions "sdkVersion"
+    productFlavors {
+        standard {
+            dimension "sdkVersion"
+            minSdkVersion 9
+            versionName "1.3-api9"
+        }
+        legacy20 {
+            dimension "sdkVersion"
+            minSdkVersion 5
+            versionName "1.3-api5"
+        }
     }
     signingConfigs {
         debug {
