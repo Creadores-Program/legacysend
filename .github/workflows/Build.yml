@@ -4,11 +4,11 @@ on:
   push:
     paths-ignore:
       - 'README.md'
-      - 'backend/**'
+      - 'docs/**'
   pull_request:
     paths-ignore:
       - 'README.md'
-      - 'backend/**'
+      - 'docs/**'
 jobs:
   build:
     runs-on: ubuntu-latest
