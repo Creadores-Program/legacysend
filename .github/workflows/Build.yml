@@ -58,3 +58,4 @@ jobs:
         with:
           name: LegacySendApp
           path: app/build/outputs/apk/**/*.apk
+          include-hidden-files: false
