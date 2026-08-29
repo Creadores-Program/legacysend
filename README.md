@@ -6,6 +6,9 @@ If you don't speak Chinese, please check our [GitHub Wiki](https://github.com/Cr
 
 当前版本：`1.3`（versionCode 5）。
 
+> **⚠️ 注意 / NOTE:** 
+> 针对 Android 2.0 - 2.2 (API 5–8) 的 **Legacy20** 构建版本目前属于 **实验性 (Experimental)** 功能。由于早期 Android 系统 TLS/JSSE 库与 Dalvik 运行时的严重 API 缺失，该版本需要配合 [Wolfius](https://github.com/gohoski/Wolfius) 环境/补丁才能正常进行 HTTPS 加密传输与运行。
+
 ## 下载与安装
 
 已编译好的 APK 文件可以直接在本项目的 **GitHub Releases（发布版）** 页面下载安装，无需手动编译。针对 Android 2.3 至 6.0 设备，应用均支持使用 v1 签名直接安装。
@@ -24,14 +27,12 @@ If you don't speak Chinese, please check our [GitHub Wiki](https://github.com/Cr
 
 ```bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug
-
 ```
 
 编译输出 APK 路径：
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
-
 ```
 
 项目 `minSdkVersion` 为 9，`compileSdkVersion` 为 23，`targetSdkVersion` 为 23 (Android 6.0)。这确保了极其轻量且统一的构建环境，完全契合经典 Android 时代的存储权限与服务语义；本项目不面向 Google Play 发布。
@@ -66,7 +67,6 @@ app/src/main/java/com/blithe/legacysend/
 ├── transfer/                HTTPS/HTTP 发送客户端和进度/取消
 ├── ui/                      传统 Android View 中文界面
 └── util/                    流式复制和进度工具
-
 ```
 
 业务源码全部为 Java；没有 Kotlin、Compose、Flutter、Dart 或 React Native 代码。Gradle 使用 Groovy DSL。
@@ -84,6 +84,7 @@ app/src/main/java/com/blithe/legacysend/
 * **获取 MulticastLock：** 获取 `MulticastLock` 后监听组播；网络和文件 I/O 全部在后台线程执行。
 * **流式处理：** 文件使用 32 KiB 缓冲流式复制，支持 Chunked 流式接收与落盘，并校验实际字节数与元数据大小一致。
 * **通知系统：** 前台 Service 为 API 9–23 统一使用传统通知系统。
+* **Legacy20 (Android 2.0–2.2) 实验性分支：** 针对 API 5–8 的系统环境，必须依赖 [Wolfius](https://github.com/gohoski/Wolfius) 解决 JSSE/TLS 缺失与 Dalvik 兼容性问题。
 
 ## 依赖
 
@@ -137,7 +138,7 @@ Android 4.4 的系统 TLS 服务端与 LocalSend 1.17.0 没有共同密码套件
 
 * 保持独立实现：不要导入、复制或构建 LocalSend 的源码、资源、模块或内部库。可以依据公开协议文档、公开源码中的协议行为以及黑盒测试进行兼容实现。
 * 业务代码使用 Java 和传统 Android View，不引入 Kotlin、Compose、Flutter、React Native 或 Google Play 服务。
-* 保持兼容范围专注于 `minSdkVersion 9` 至 `targetSdkVersion 23`。
+* 保持兼容范围专注于 `minSdkVersion 9` 至 `targetSdkVersion 23`（Legacy20 实验性版本例外）。
 * 网络与文件 I/O 必须在后台线程运行；文件应流式处理，不能完整载入内存，并正确关闭 Socket 和流。
 * 修改存储、通知、TLS、文件选择或生命周期逻辑时，应分别检查 API 9、API 19 和 Android 6.0 的行为。
 * 保持模块职责清晰：发现、协议、安全、服务端、存储、传输和 UI 逻辑不要集中到单个 Activity。
@@ -149,5 +150,4 @@ Android 4.4 的系统 TLS 服务端与 LocalSend 1.17.0 没有共同密码套件
 
 ```bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug
-
 ```
