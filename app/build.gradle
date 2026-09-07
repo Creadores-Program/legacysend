@@ -49,6 +49,9 @@ android {
         checkReleaseBuilds true
         // 本项目不是 Play 商店应用；target 28 用于保留 API 19 到旧式外部存储的一致语义。
         disable 'ExpiredTargetSdkVersion'
+        showAll true
+        warningsAsErrors false
+        enable 'Deprecated'
     }
 }
 
