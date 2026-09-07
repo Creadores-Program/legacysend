@@ -87,13 +87,12 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         super.onPause();
     }
 
-    @SuppressWarnings("deprecation")
     private void buildUi() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(18), dp(20), dp(18), dp(28));
-        scroll.addView(root, new ScrollView.LayoutParams(ViewGroup.LayoutParams.FILL_PARENT,
+        scroll.addView(root, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView title = text(getString(R.string.app_name), 26, Color.rgb(25, 55, 90));
@@ -398,7 +397,6 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
                 .show();
     }
 
-    @SuppressWarnings("deprecation")
     private void showProgress(final boolean sending, String title, String file, int percent, String path) {
         if (progressDialog == null) {
             LinearLayout content = new LinearLayout(this);
@@ -427,7 +425,7 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
             progressDialog.setCancelable(false);
             progressDialog.show();
             if (progressDialog.getWindow() != null) progressDialog.getWindow().setLayout(
-                    ViewGroup.LayoutParams.FILL_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
         progressTitle.setText(title);
         progressFile.setText(file.length() == 0 ? getString(R.string.status_preparing) : getString(R.string.label_current_file, file));
@@ -478,9 +476,8 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         return view;
     }
 
-    @SuppressWarnings("deprecation")
     private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.FILL_PARENT,
+        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
