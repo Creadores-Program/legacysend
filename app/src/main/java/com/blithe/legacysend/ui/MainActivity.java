@@ -42,11 +42,13 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
 
     private static final int PICK_FILES = 1001;
     private static final int STORAGE_PERMISSION = 1002;
+    private static final int PICK_SAVE_DIRECTORY = 1003;
 
     private LegacySendApp app;
     private TextView deviceName;
     private TextView serviceStatus;
     private Button serviceButton;
+    private TextView saveDirectory;
     private LinearLayout selectedFilesContainer;
     private LinearLayout devicesContainer;
     private final List<TransferFile> selectedFiles = new ArrayList<TransferFile>();
