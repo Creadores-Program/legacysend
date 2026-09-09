@@ -84,4 +84,16 @@
     <string name="dialog_title_receiving_status">Stato della ricezione</string>
     <string name="status_preparing">Preparazione…</string>
     <string name="label_current_file">File attuale: %1$s</string>
+    <string name="error_saf_not_supported">La versione del sistema non supporta le cartelle di documenti</string>
+    <string name="saf_default_folder_name">Cartella Documenti</string>
+    <string name="saf_folder_suffix"> (Cartella di sistema)</string>
+    <string name="error_use_directory_failed">Impossibile utilizzare la cartella di salvataggio: %1$s</string>
+    <string name="receive_settings">Impostazioni di ricezione</string>
+    <string name="select_save_directory">Seleziona cartella di salvataggio</string>
+    <string name="restore_defaults">Ripristina impostazioni predefinite</string>
+    <string name="msg_restored_default_directory">La cartella di salvataggio predefinita è stata ripristinata</string>
+    <string name="btn_use_this_folder">Usa questa cartella</string>
+    <string name="error_directory_not_writable">La cartella selezionata non è scrivibile</string>
+    <string name="msg_save_directory_updated">Cartella di salvataggio aggiornata</string>
+    <string name="error_system_permission_not_granted">Il sistema non ha concesso i permessi di lettura e scrittura per la cartella</string>
 </resources>
