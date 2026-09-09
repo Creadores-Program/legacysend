@@ -8,6 +8,7 @@ import com.blithe.legacysend.model.TransferFile;
 import com.blithe.legacysend.protocol.ProtocolJson;
 import com.blithe.legacysend.security.TlsIdentity;
 import com.blithe.legacysend.storage.StorageUtils;
+import com.blithe.legacysend.storage.ReceiveDirectory;
 import com.blithe.legacysend.util.IoUtils;
 
 import org.json.JSONObject;
@@ -15,8 +16,6 @@ import org.json.JSONObject;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -232,24 +231,21 @@ public final class TransferServer {
             return;
         }
 
-        File directory = StorageUtils.receiveDirectory(context);
-        if (!directory.exists() && !directory.mkdirs()) {
-            throw new IOException(context.getString(R.string.error_create_directory_failed));
+        ReceiveDirectory directory = session.getReceiveDirectory();
+        if (directory == null) directory = StorageUtils.receiveDirectory(context);
+
+        final ReceiveDirectory.PendingFile target;
+        try {
+            target = directory.createFile(metadata.getFileName(), metadata.getFileType(), sessionId);
+        } catch (Exception error) {
+            listener.onReceiveFailed(session, "无法使用保存目录：" + readable(error));
+            throw error;
         }
 
-        final File target;
-        synchronized (StorageUtils.class) {
-            target = StorageUtils.uniqueFile(context, directory, metadata.getFileName());
-            if (!target.createNewFile()) {
-                throw new IOException(context.getString(R.string.error_reserve_file_failed));
-            }
-        }
-
-        final File temporary = new File(directory, "." + target.getName() + "." + sessionId + ".part");
         InputStream payloadInput = request.isChunked ? new ChunkedInputStream(input, session) : input;
 
         try {
-            FileOutputStream fileOutput = new FileOutputStream(temporary);
+            OutputStream fileOutput = target.openOutputStream();
             long bytesToRead = metadata.getSize();
 
             try {
@@ -261,7 +257,7 @@ public final class TransferServer {
                         }
                         long overall = currentSession.updateFileProgress(metadata.getId(), copied);
                         listener.onReceiveProgress(currentSession, metadata.getFileName(),
-                                IoUtils.percent(overall, currentSession.getTotalBytes()), target.getAbsolutePath());
+                                IoUtils.percent(overall, currentSession.getTotalBytes()), target.getDisplayPath());
                     }
                 });
             } finally {
@@ -272,11 +268,7 @@ public final class TransferServer {
                 throw new IOException(context.getString(R.string.error_file_size_mismatch));
             }
 
-            synchronized (StorageUtils.class) {
-                if (!target.delete() || !temporary.renameTo(target)) {
-                    throw new IOException(context.getString(R.string.error_save_file_failed));
-                }
-            }
+            target.commit();
 
             session.getReceivedBytes().addAndGet(metadata.getSize());
             Set<String> done = completedFiles.get(sessionId);
@@ -287,11 +279,10 @@ public final class TransferServer {
             if (done != null && done.size() == session.getFiles().size()) {
                 sessions.remove(sessionId);
                 completedFiles.remove(sessionId);
-                listener.onReceiveFinished(session, directory.getAbsolutePath());
+                listener.onReceiveFinished(session, directory.getDisplayPath());
             }
         } catch (Exception error) {
-            if (temporary.exists()) temporary.delete();
-            if (target.exists() && target.length() == 0) target.delete();
+            target.discard();
             listener.onReceiveFailed(session, readable(error));
             throw error;
         }
