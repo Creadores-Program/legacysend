@@ -60,7 +60,7 @@ public final class ReceiveDirectory {
             if (!fileDirectory.exists() && !fileDirectory.mkdirs()) {
                 throw new IOException(context.getString(R.string.error_create_directory_failed));
             }
-            File target = StorageUtils.uniqueFile(fileDirectory, requestedName);
+            File target = StorageUtils.uniqueFile(context, fileDirectory, requestedName);
             if (!target.createNewFile()) {
                 throw new IOException(context.getString(R.string.error_reserve_file_failed));
             }
