@@ -25,7 +25,7 @@
     <string name="error_endpoint_not_found">O ponto de extremidade (endpoint) ou caminho não existe</string>
     <string name="error_file_size_mismatch">O tamanho do arquivo não coincide</string>
     <string name="error_create_directory_failed">Não foi possível criar o diretório de destino</string>
-    <string name="error_reserve_file_failed">Não foi possible reservar o nome do arquivo</string>
+    <string name="error_reserve_file_failed">Não foi possível reservar o nome do arquivo</string>
     <string name="error_reception_cancelled">A recepção foi cancelada</string>
     <string name="error_save_file_failed">Não foi possível salvar o arquivo</string>
     <string name="unnamed_file">Arquivo_Sem_Nome</string>
@@ -84,4 +84,16 @@
     <string name="dialog_title_receiving_status">Status da recepção</string>
     <string name="status_preparing">Preparando…</string>
     <string name="label_current_file">Arquivo atual: %1$s</string>
+    <string name="error_saf_not_supported">A versão do sistema não suporta pastas de documentos</string>
+    <string name="saf_default_folder_name">Pasta de documentos</string>
+    <string name="saf_folder_suffix"> (Pasta do sistema)</string>
+    <string name="error_use_directory_failed">Não foi possível usar a pasta de salvamento: %1$s</string>
+    <string name="receive_settings">Configurações de recepção</string>
+    <string name="select_save_directory">Selecionar pasta de salvamento</string>
+    <string name="restore_defaults">Restaurar padrões</string>
+    <string name="msg_restored_default_directory">A pasta de salvamento padrão foi restaurada</string>
+    <string name="btn_use_this_folder">Usar esta pasta</string>
+    <string name="error_directory_not_writable">A pasta selecionada não permite gravação</string>
+    <string name="msg_save_directory_updated">Pasta de salvamento atualizada</string>
+    <string name="error_system_permission_not_granted">O sistema não concedeu permissões de leitura e escrita para a pasta</string>
 </resources>
