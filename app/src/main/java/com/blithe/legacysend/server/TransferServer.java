@@ -238,7 +238,7 @@ public final class TransferServer {
         try {
             target = directory.createFile(metadata.getFileName(), metadata.getFileType(), sessionId);
         } catch (Exception error) {
-            listener.onReceiveFailed(session, "无法使用保存目录：" + readable(error));
+            listener.onReceiveFailed(session, context.getString(R.string.error_use_directory_failed, readable(error)));
             throw error;
         }
 
