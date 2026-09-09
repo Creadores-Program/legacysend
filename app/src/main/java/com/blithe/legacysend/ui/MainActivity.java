@@ -516,7 +516,7 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
                     @Override public void onClick(DialogInterface dialog, int which) {
                         app.decideIncoming(session, true);
                         showProgress(false, getString(R.string.status_waiting_sender), "", 0,
-                                StorageUtils.receiveDirectory(MainActivity.this).getAbsolutePath());
+                                StorageUtils.receiveDirectory(MainActivity.this).getDisplayPath());
                     }
                 }).create();
         dialog.show();
