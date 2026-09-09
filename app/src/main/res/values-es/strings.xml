@@ -88,4 +88,12 @@
     <string name="saf_default_folder_name">Directorio de documentos</string>
     <string name="saf_folder_suffix"> (Directorio del sistema)</string>
     <string name="error_use_directory_failed">No se puede usar el directorio de guardado: %1$s</string>
+    <string name="receive_settings">Ajustes de recepción</string>
+    <string name="select_save_directory">Seleccionar carpeta de guardado</string>
+    <string name="restore_defaults">Restablecer valores predeterminados</string>
+    <string name="msg_restored_default_directory">Se ha restablecido la carpeta de guardado predeterminada</string>
+    <string name="btn_use_this_folder">Usar esta carpeta</string>
+    <string name="error_directory_not_writable">El directorio seleccionado no se puede escribir</string>
+    <string name="msg_save_directory_updated">Carpeta de guardado actualizada</string>
+    <string name="error_system_permission_not_granted">El sistema no concedió permisos de lectura y escritura para el directorio</string>
 </resources>
