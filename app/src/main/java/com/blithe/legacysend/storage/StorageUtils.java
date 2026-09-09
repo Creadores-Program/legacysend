@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.provider.OpenableColumns;
 import android.webkit.MimeTypeMap;
@@ -70,11 +71,15 @@ public final class StorageUtils {
 
     public static File receiveDirectory(Context context) {
         File downloads;
-        if (android.os.Build.VERSION.SDK_INT >= 29) {
-            downloads = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-            if (downloads == null) downloads = context.getFilesDir();
-        } else {
+        if (Build.VERSION.SDK_INT >= 8) {
             downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        } else {
+            File sdCard = Environment.getExternalStorageDirectory();
+            if (sdCard != null && sdCard.exists()) {
+                downloads = new File(sdCard, "Download");
+            } else {
+                downloads = new File(context.getFilesDir(), "Download");
+            }
         }
         return new File(downloads, "LegacySend");
     }
