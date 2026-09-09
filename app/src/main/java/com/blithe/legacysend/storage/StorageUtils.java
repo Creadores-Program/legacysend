@@ -149,8 +149,8 @@ public final class StorageUtils {
         return new File(directory, base + "-" + System.currentTimeMillis() + extension);
     }
 
-    public static String uniqueName(Set<String> existingNames, String requestedName) {
-        String safe = sanitizeFileName(requestedName);
+    public static String uniqueName(Context context, Set<String> existingNames, String requestedName) {
+        String safe = sanitizeFileName(context, requestedName);
         if (!existingNames.contains(safe)) return safe;
         int dot = safe.lastIndexOf('.');
         String base = dot > 0 ? safe.substring(0, dot) : safe;
