@@ -87,4 +87,5 @@
     <string name="error_saf_not_supported">La versión del sistema no soporta carpetas de documentos</string>
     <string name="saf_default_folder_name">Directorio de documentos</string>
     <string name="saf_folder_suffix"> (Directorio del sistema)</string>
+    <string name="error_use_directory_failed">No se puede usar el directorio de guardado: %1$s</string>
 </resources>
