@@ -84,4 +84,16 @@
     <string name="dialog_title_receiving_status">Receiving Status</string>
     <string name="status_preparing">Preparing…</string>
     <string name="label_current_file">Current file: %1$s</string>
+    <string name="error_saf_not_supported">System version does not support document folders</string>
+    <string name="saf_default_folder_name">Documents folder</string>
+    <string name="saf_folder_suffix"> (System folder)</string>
+    <string name="error_use_directory_failed">Failed to use save directory: %1$s</string>
+    <string name="receive_settings">Receive Settings</string>
+    <string name="select_save_directory">Select Save Directory</string>
+    <string name="restore_defaults">Restore Defaults</string>
+    <string name="msg_restored_default_directory">Default save directory restored</string>
+    <string name="btn_use_this_folder">Use This Folder</string>
+    <string name="error_directory_not_writable">Selected directory is not writable</string>
+    <string name="msg_save_directory_updated">Save directory updated</string>
+    <string name="error_system_permission_not_granted">System permission not granted for read/write access to the folder</string>
 </resources>
