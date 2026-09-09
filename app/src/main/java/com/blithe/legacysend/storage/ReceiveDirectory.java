@@ -92,7 +92,7 @@ public final class ReceiveDirectory {
                     cursor.close();
                 }
             }
-            String name = StorageUtils.uniqueName(existingNames, requestedName);
+            String name = StorageUtils.uniqueName(context, existingNames, requestedName);
             String safeMime = (mimeType == null || mimeType.length() == 0)
                     ? "application/octet-stream" : mimeType;
             
