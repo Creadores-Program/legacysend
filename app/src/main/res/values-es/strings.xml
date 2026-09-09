@@ -84,4 +84,7 @@
     <string name="dialog_title_receiving_status">Estado de la recepción</string>
     <string name="status_preparing">Preparando…</string>
     <string name="label_current_file">Archivo actual: %1$s</string>
+    <string name="error_saf_not_supported">La versión del sistema no soporta carpetas de documentos</string>
+    <string name="saf_default_folder_name">Directorio de documentos</string>
+    <string name="saf_folder_suffix"> (Directorio del sistema)</string>
 </resources>
