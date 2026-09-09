@@ -84,4 +84,16 @@
     <string name="dialog_title_receiving_status">État de la réception</string>
     <string name="status_preparing">Préparation…</string>
     <string name="label_current_file">Fichier actuel : %1$s</string>
+    <string name="error_saf_not_supported">La version du système ne prend pas en charge les dossiers de documents</string>
+    <string name="saf_default_folder_name">Dossier Documents</string>
+    <string name="saf_folder_suffix"> (Dossier système)</string>
+    <string name="error_use_directory_failed">Impossible d\'utiliser le dossier d\'enregistrement : %1$s</string>
+    <string name="receive_settings">Paramètres de réception</string>
+    <string name="select_save_directory">Sélectionner le dossier d\'enregistrement</string>
+    <string name="restore_defaults">Rétablir les paramètres par défaut</string>
+    <string name="msg_restored_default_directory">Le dossier d\'enregistrement par défaut a été rétabli</string>
+    <string name="btn_use_this_folder">Utiliser ce dossier</string>
+    <string name="error_directory_not_writable">Le dossier sélectionné n\'est pas accessible en écriture</string>
+    <string name="msg_save_directory_updated">Dossier d\'enregistrement mis à jour</string>
+    <string name="error_system_permission_not_granted">Le système n\'a pas accordé les autorisations de lecture et d\'écriture pour le dossier</string>
 </resources>
