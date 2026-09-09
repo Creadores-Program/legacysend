@@ -264,10 +264,6 @@ public final class TransferServer {
                 fileOutput.close();
             }
 
-            if (temporary.length() != metadata.getSize()) {
-                throw new IOException(context.getString(R.string.error_file_size_mismatch));
-            }
-
             target.commit();
 
             session.getReceivedBytes().addAndGet(metadata.getSize());
