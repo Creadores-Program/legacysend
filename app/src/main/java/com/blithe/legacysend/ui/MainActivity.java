@@ -131,6 +131,28 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         root.addView(serviceActions, matchWrap());
 
         root.addView(space(18));
+        root.addView(section(getString(R.string.receive_settings)));
+        saveDirectory = text("", 14, Color.DKGRAY);
+        root.addView(saveDirectory, matchWrap());
+        LinearLayout storageActions = horizontal();
+        Button chooseDirectory = button(getString(R.string.select_save_directory));
+        chooseDirectory.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) { openSaveDirectoryPicker(); }
+        });
+        Button resetDirectory = button(getString(R.string.restore_defaults));
+        resetDirectory.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                StorageUtils.resetReceiveDirectory(MainActivity.this);
+                renderSaveDirectory();
+                Toast.makeText(MainActivity.this, getString(R.string.msg_restored_default_directory), Toast.LENGTH_SHORT).show();
+            }
+        });
+        storageActions.addView(chooseDirectory, weighted());
+        storageActions.addView(resetDirectory, weighted());
+        root.addView(storageActions, matchWrap());
+        renderSaveDirectory();
+
+        root.addView(space(18));
         root.addView(section(getString(R.string.section_select_files)));
         Button choose = button(getString(R.string.btn_choose_files));
         choose.setOnClickListener(new View.OnClickListener() {
@@ -164,6 +186,98 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
         intent.setType("*/*");
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         startActivityForResult(intent, PICK_FILES);
+    }
+
+    private void openSaveDirectoryPicker() {
+        if (Build.VERSION.SDK_INT <= 20) {
+            openLegacySaveDirectory(legacyStorageRoot());
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        startActivityForResult(intent, PICK_SAVE_DIRECTORY);
+    }
+
+    private void openLegacySaveDirectory(final File directory) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, R.string.error_read_dir_permission, Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        if (directory == null || !directory.exists()) {
+            Toast.makeText(this, R.string.error_read_dir_permission, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        File[] listed = directory.listFiles();
+        if (listed == null) {
+            Toast.makeText(this, R.string.error_read_dir_permission, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final List<File> directories = new ArrayList<File>();
+        for (File entry : listed) {
+            if (entry.isDirectory() && entry.canRead()) {
+                directories.add(entry);
+            }
+        }
+
+        Collections.sort(directories, new Comparator<File>() {
+            @Override
+            public int compare(File left, File right) {
+                return left.getName().compareToIgnoreCase(right.getName());
+            }
+        });
+
+        String[] labels = new String[directories.size()];
+        for (int i = 0; i < directories.size(); i++) {
+            labels[i] = directories.get(i).getName();
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+            .setTitle(getString(R.string.select_save_directory) + "\n" + directory.getAbsolutePath())
+            .setItems(labels, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    openLegacySaveDirectory(directories.get(which));
+                }
+            })
+            .setNegativeButton(R.string.btn_cancel, null)
+            .setPositiveButton(R.string.btn_use_this_folder, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    if (!directory.canWrite()) {
+                        Toast.makeText(MainActivity.this, R.string.error_directory_not_writable, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    StorageUtils.setReceiveDirectory(MainActivity.this, directory);
+                    renderSaveDirectory();
+                    Toast.makeText(MainActivity.this, R.string.msg_save_directory_updated, Toast.LENGTH_SHORT).show();
+                }
+        });
+
+        File root = legacyStorageRoot();
+        File parent = directory.getParentFile();
+        if (parent != null && !directory.equals(root)) {
+            builder.setNeutralButton(R.string.btn_parent_directory, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    openLegacySaveDirectory(directory.getParentFile());
+                }
+            });
+        }
+
+        builder.show();
+    }
+
+    private void renderSaveDirectory() {
+        String path = StorageUtils.receiveDirectory(this).getDisplayPath();
+        saveDirectory.setText(getString(R.string.label_save_location, path));
     }
 
     private void openLegacyDirectory(final File directory) {
@@ -231,6 +345,30 @@ public final class MainActivity extends Activity implements LegacySendApp.UiList
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_SAVE_DIRECTORY) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                Uri treeUri = data.getData();
+                try {
+                    int grantedFlags = data.getFlags();
+                    boolean canRead = (grantedFlags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0;
+                    boolean canWrite = (grantedFlags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0;
+                    if (canRead && canWrite) {
+                        getContentResolver().takePersistableUriPermission(treeUri,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    } else {
+                        throw new SecurityException(getString(R.string.error_system_permission_not_granted));
+                    }
+                    StorageUtils.setReceiveDirectory(this, treeUri);
+                    renderSaveDirectory();
+                    Toast.makeText(this, R.string.msg_save_directory_updated, Toast.LENGTH_SHORT).show();
+                } catch (Exception error) {
+                    Toast.makeText(this, getString(R.string.error_use_directory_failed, error.getMessage()),
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+            return;
+        }
         if (requestCode != PICK_FILES || resultCode != RESULT_OK || data == null) return;
         int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
                 | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
