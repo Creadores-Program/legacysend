@@ -2,6 +2,7 @@ package com.blithe.legacysend.server;
 
 import com.blithe.legacysend.model.DeviceInfo;
 import com.blithe.legacysend.model.TransferFile;
+import com.blithe.legacysend.storage.ReceiveDirectory;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ public final class IncomingSession {
     private final CountDownLatch decisionLatch;
     private final AtomicLong receivedBytes;
     private volatile Decision decision;
+    private volatile ReceiveDirectory receiveDirectory;
 
     public IncomingSession(DeviceInfo sender, InetAddress senderAddress, List<TransferFile> files) {
         this.sessionId = UUID.randomUUID().toString();
@@ -120,4 +122,6 @@ public final class IncomingSession {
     public String getToken(String fileId) { return fileId == null ? null : tokens.get(fileId); }
     public Decision getDecision() { return decision; }
     public AtomicLong getReceivedBytes() { return receivedBytes; }
+    public ReceiveDirectory getReceiveDirectory() { return receiveDirectory; }
+    public void setReceiveDirectory(ReceiveDirectory directory) { receiveDirectory = directory; }
 }

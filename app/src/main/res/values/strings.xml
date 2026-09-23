@@ -84,4 +84,16 @@
     <string name="dialog_title_receiving_status">接收状态</string>
     <string name="status_preparing">准备中</string>
     <string name="label_current_file">当前文件：%1$s</string>
+    <string name="error_saf_not_supported">系统版本不支持文档文件夹</string>
+    <string name="saf_default_folder_name">文档文件夹</string>
+    <string name="saf_folder_suffix"> (系统文件夹)</string>
+    <string name="error_use_directory_failed">无法使用保存目录：%1$s</string>
+    <string name="receive_settings">接收设置</string>
+    <string name="select_save_directory">选择保存目录</string>
+    <string name="restore_defaults">恢复默认设置</string>
+    <string name="msg_restored_default_directory">已恢复默认保存目录</string>
+    <string name="btn_use_this_folder">使用此文件夹</string>
+    <string name="error_directory_not_writable">所选文件夹无写入权限</string>
+    <string name="msg_save_directory_updated">保存目录已更新</string>
+    <string name="error_system_permission_not_granted">系统未授予该文件夹的读写权限</string>
 </resources>
