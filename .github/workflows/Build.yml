@@ -17,6 +17,10 @@ on:
         description: '¿Simulate a release event?'
         type: boolean
         default: false
+
+permissions:
+  contents: write
+  
 jobs:
   build:
     runs-on: ubuntu-latest
